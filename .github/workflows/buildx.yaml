@@ -1,0 +1,75 @@
+on:
+  workflow_call:
+    inputs:
+      image:
+        type: string
+        required: true
+      platforms:
+        type: string
+        required: false
+        default: linux/amd64,linux/arm64
+      license:
+        type: string
+        required: false
+        default: BSD-2-Clause-Patent
+      vendor:
+        type: string
+        required: false
+        default: ectobit.com
+    secrets:
+      container-registry-username:
+        required: true
+      container-registry-password:
+        required: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2.0.0
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Set up tags
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ inputs.image }}
+          labels: |
+            org.opencontainers.image.licenses=${{ inputs.license }}
+            org.opencontainers.image.vendor=${{ inputs.vendor }}
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=edge
+            type=sha
+      - name: Login to container registry
+        uses: docker/login-action@v2.0.0
+        with:
+          username: ${{ secrets.container-registry-username }}
+          password: ${{ secrets.container-registry-password }}
+      - name: Build and push image to container registry
+        uses: docker/build-push-action@v3.0.0
+        with:
+          platforms: ${{ inputs.platforms }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
