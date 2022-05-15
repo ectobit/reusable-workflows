@@ -1,0 +1,71 @@
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        type: string
+        required: false
+        default: 1.18.2
+      golangci-lint-version:
+        type: string
+        required: false
+        default: v1.46.1
+      nancy-version:
+        type: string
+        required: false
+        default: v1.0.33
+      test-command:
+        type: string
+        required: false
+      hadolint:
+        type: boolean
+        required: false
+      hadolint-dockerfile:
+        type: string
+        required: false
+        default: Dockerfile
+      hadolint-ignore:
+        type: string
+        required: false
+        default: ''
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ inputs.go-version }}
+      - name: Set up cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Set up linters
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${{ inputs.golangci-lint-version }}
+          curl -sSL -o /usr/local/bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/${{ inputs.nancy-version }}/nancy-${{ inputs.nancy-version }}-linux-amd64 && chmod 755 /usr/local/bin/nancy
+      - name: Check out
+        uses: actions/checkout@v3
+      - name: Lint
+        run: |
+          golangci-lint run
+          go list -json -deps | nancy sleuth
+      - name: Test
+        if: ${{ inputs.test-command != '' }}
+        run: ${{ inputs.test-command }}
+      - name: Lint Dockerfile with ignore
+        if: ${{ inputs.hadolint && inputs.hadolint-ignore != ''}}
+        uses: hadolint/hadolint-action@v2.1.0
+        with:
+          dockerfile: ${{ inputs.hadolint-dockerfile }}
+          ignore: ${{ inputs.hadolint-ignore }}
+      - name: Lint Dockerfile
+        if: ${{ inputs.hadolint && inputs.hadolint-ignore == ''}}
+        uses: hadolint/hadolint-action@v2.1.0
+        with:
+          dockerfile: ${{ inputs.hadolint-dockerfile }}
