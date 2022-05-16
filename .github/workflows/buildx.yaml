@@ -24,6 +24,10 @@ on:
         type: string
         required: false
         default: ''
+      build-args:
+        type: string
+        required: false
+        default: ''
     secrets:
       container-registry-username:
         required: true
@@ -72,8 +76,20 @@ jobs:
         with:
           username: ${{ secrets.container-registry-username }}
           password: ${{ secrets.container-registry-password }}
+      - name: Build and push image with build args to container registry
+        uses: docker/build-push-action@v3.0.0
+        if: ${{ inputs.build-args != ''}}
+        with:
+          build-args: ${{ inputs.build-args }}
+          platforms: ${{ inputs.platforms }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=user/app:buildcache
+          cache-to: type=registry,ref=user/app:buildcache,mode=max
       - name: Build and push image to container registry
         uses: docker/build-push-action@v3.0.0
+        if: ${{ inputs.build-args == ''}}
         with:
           platforms: ${{ inputs.platforms }}
           push: ${{ github.event_name != 'pull_request' }}
