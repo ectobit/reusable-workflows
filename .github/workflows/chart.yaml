@@ -1,0 +1,39 @@
+on:
+  workflow_call:
+    inputs:
+      chart:
+        type: string
+        required: true
+    secrets:
+      helm-repo-username:
+        required: true
+      helm-repo-password:
+        required: true
+      gpg-signing-key:
+        required: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Helm
+        run: |
+          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
+          chmod 700 get_helm.sh
+          ./get_helm.sh
+      - name: Check out
+        uses: actions/checkout@v3
+      - name: Lint
+        run: helm lint ${{ inputs.chart }}
+      - name: Configure GPG key
+        run: |
+          mkdir -p ~/.gnupg/
+          printf "${{ secrets.gpg-signing-key }}" | base64 -d > ~/.gnupg/pubring.gpg
+      - name: Release
+        run: |
+          FILE_PATH=$(helm package --sign --key 'Boban Acimovic' ${{ inputs.chart }} | awk '{print $8}')
+          FILE=$(basename ${FILE_PATH})
+          echo "Uploading ${FILE} chart and provenance ${FILE}.prov"
+          curl -u "${{ secrets.helm-repo-username }}:${{ secrets.helm-repo-password }}" \
+            -F "chart=@${FILE}" \
+            -F "prov=@${FILE}.prov" \
+            https://charts.ectobit.com/api/charts
