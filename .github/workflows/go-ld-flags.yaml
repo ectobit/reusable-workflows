@@ -1,5 +1,9 @@
 on:
   workflow_call:
+    outputs:
+      flags:
+        description: ld flags
+        value: ${{ jobs.flags.outputs.flags }}
 
 jobs:
   flags:
@@ -17,4 +21,4 @@ jobs:
           fi
           BUILD_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
           LD_FLAGS="-s -w -extldflags '-static' -X main.version=${VERSION} -X main.revision=${GITHUB_SHA} -X main.buildDate=${BUILD_DATE}"
-          echo ::set-output name=flags::${LD_FLAGS}
+          echo "::set-output name=flags::${LD_FLAGS}"
