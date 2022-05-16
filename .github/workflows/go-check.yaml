@@ -16,17 +16,6 @@ on:
       test-command:
         type: string
         required: false
-      hadolint:
-        type: boolean
-        required: false
-      hadolint-dockerfile:
-        type: string
-        required: false
-        default: Dockerfile
-      hadolint-ignore:
-        type: string
-        required: false
-        default: ''
 
 jobs:
   check:
@@ -58,14 +47,3 @@ jobs:
       - name: Test
         if: ${{ inputs.test-command != '' }}
         run: ${{ inputs.test-command }}
-      - name: Lint Dockerfile with ignore
-        if: ${{ inputs.hadolint && inputs.hadolint-ignore != ''}}
-        uses: hadolint/hadolint-action@v2.1.0
-        with:
-          dockerfile: ${{ inputs.hadolint-dockerfile }}
-          ignore: ${{ inputs.hadolint-ignore }}
-      - name: Lint Dockerfile
-        if: ${{ inputs.hadolint && inputs.hadolint-ignore == ''}}
-        uses: hadolint/hadolint-action@v2.1.0
-        with:
-          dockerfile: ${{ inputs.hadolint-dockerfile }}

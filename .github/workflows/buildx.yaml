@@ -16,6 +16,14 @@ on:
         type: string
         required: false
         default: ectobit.com
+      hadolint-dockerfile:
+        type: string
+        required: false
+        default: Dockerfile
+      hadolint-ignore:
+        type: string
+        required: false
+        default: ''
     secrets:
       container-registry-username:
         required: true
@@ -27,6 +35,17 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v3
+      - name: Lint Dockerfile with ignore
+        if: ${{ inputs.hadolint-ignore != ''}}
+        uses: hadolint/hadolint-action@v2.1.0
+        with:
+          dockerfile: ${{ inputs.hadolint-dockerfile }}
+          ignore: ${{ inputs.hadolint-ignore }}
+      - name: Lint Dockerfile
+        if: ${{ inputs.hadolint-ignore == ''}}
+        uses: hadolint/hadolint-action@v2.1.0
+        with:
+          dockerfile: ${{ inputs.hadolint-dockerfile }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
