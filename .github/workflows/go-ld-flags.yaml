@@ -1,0 +1,20 @@
+on:
+  workflow_call:
+
+jobs:
+  flags:
+    runs-on: ubuntu-latest
+    outputs:
+      flags: ${{ steps.flags.outputs.flags }}
+    steps:
+      - name: Set up linker flags
+        id: flags
+        run: |
+          if  [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=${GITHUB_SHA::8}
+          fi
+          BUILD_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          LD_FLAGS="-s -w -extldflags '-static' -X main.version=${VERSION} -X main.revision=${GITHUB_SHA} -X main.buildDate=${BUILD_DATE}"
+          echo ::set-output name=flags::${LD_FLAGS}
