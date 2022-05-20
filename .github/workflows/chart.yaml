@@ -30,7 +30,7 @@ jobs:
           mkdir -p ~/.gnupg/
           printf "${{ secrets.gpg-signing-key }}" | base64 -d > ~/.gnupg/pubring.gpg
       - name: Release
-        if: ${{ secrets.gpg-signing-key != '' }}
+        if: ${{ secrets.gpg-signing-key != '' && secrets.helm-repo-username != '' && secrets.helm-repo-password != '' }}
         run: |
           FILE_PATH=$(helm package --sign --key 'Boban Acimovic' ${{ inputs.chart }} | awk '{print $8}')
           FILE=$(basename ${FILE_PATH})
