@@ -6,11 +6,11 @@ on:
         required: true
     secrets:
       helm-repo-username:
-        required: true
+        required: false
       helm-repo-password:
-        required: true
+        required: false
       gpg-signing-key:
-        required: true
+        required: false
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,10 +25,12 @@ jobs:
       - name: Lint
         run: helm lint ${{ inputs.chart }}
       - name: Configure GPG key
+        if: ${{ secrets.gpg-signing-key != '' }}
         run: |
           mkdir -p ~/.gnupg/
           printf "${{ secrets.gpg-signing-key }}" | base64 -d > ~/.gnupg/pubring.gpg
       - name: Release
+        if: ${{ secrets.gpg-signing-key != '' }}
         run: |
           FILE_PATH=$(helm package --sign --key 'Boban Acimovic' ${{ inputs.chart }} | awk '{print $8}')
           FILE=$(basename ${FILE_PATH})
