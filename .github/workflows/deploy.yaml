@@ -1,0 +1,36 @@
+on:
+  workflow_call:
+    inputs:
+      image:
+        type: string
+        required: true
+      tag:
+        type: string
+        required: true
+      deployment-name:
+        type: string
+        required: true
+      container-name:
+        type: string
+        required: true
+    secrets:
+      kubernetes-server:
+        required: true
+      kubernetes-token:
+        required: true
+      kubernetes-cert:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Kubernetes cluster
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+        run: |
+          kubectl config set-credentials default --token=${{ secrets.kubernetes-token }}
+          echo ${{ secrets.kubernetes-cert }} | base64 -d > ca.crt
+          kubectl config set-cluster default --server=${{ secrets.kubernetes-server }} --certificate-authority=ca.crt
+          kubectl config set-context default --cluster=default --user=default
+          kubectl config use-context default
+          kubectl set image deployment/${{ inputs.deployment-name }} ${{ inputs.container-name }}=${{ inputs.image }}:${{ inputs.tag }}
