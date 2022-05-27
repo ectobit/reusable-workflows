@@ -4,15 +4,15 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.18.2
+        default: 1.18.3
       golangci-lint-version:
         type: string
         required: false
-        default: v1.46.1
+        default: v1.46.2
       nancy-version:
         type: string
         required: false
-        default: v1.0.33
+        default: v1.0.36
       test-command:
         type: string
         required: false
