@@ -77,6 +77,7 @@ jobs:
           labels: |
             org.opencontainers.image.licenses=${{ inputs.license }}
             org.opencontainers.image.vendor=${{ inputs.vendor }}
+            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ inputs.image }}/main/README.md
           tags: |
             type=schedule
             type=ref,event=branch
@@ -90,7 +91,7 @@ jobs:
         id: tags
         run: |
           echo "::set-output name=sha-tag::sha-$(echo ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }} | cut -c1-7)"
-      - name: Login to container registry
+      - name: Login to Docker Hub container registry
         uses: docker/login-action@v2.0.0
         if: ${{ inputs.registry == ''}}
         with:
@@ -103,7 +104,7 @@ jobs:
           registry: ${{ inputs.registry }}
           username: ${{ secrets.container-registry-username }}
           password: ${{ secrets.container-registry-password }}
-      - name: Build and push image to container registry using ${{ inputs.cache-type }} cache
+      - name: Build and push image to container registry using registry cache
         uses: docker/build-push-action@v3.0.0
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args == '' }}
         with:
@@ -113,7 +114,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ inputs.image }}:buildcache
           cache-to: type=registry,ref=${{ inputs.image }}:buildcache,mode=max
-      - name: Build and push image with build args ${{ inputs.build-args }} to container registry using ${{ inputs.cache-type }} cache
+      - name: Build and push image with build args ${{ inputs.build-args }} to container registry using registry cache
         uses: docker/build-push-action@v3.0.0
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args != '' }}
         with:
@@ -124,7 +125,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ inputs.image }}:buildcache
           cache-to: type=registry,ref=${{ inputs.image }}:buildcache,mode=max
-      - name: Build and push image to container registry using ${{ inputs.cache-type }} cache
+      - name: Build and push image to container registry using gha cache
         uses: docker/build-push-action@v3.0.0
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args == '' }}
         with:
@@ -134,7 +135,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Build and push image with build args ${{ inputs.build-args }} to container registry using ${{ inputs.cache-type }} cache
+      - name: Build and push image with build args ${{ inputs.build-args }} to container registry using gha cache
         uses: docker/build-push-action@v3.0.0
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args != '' }}
         with:
