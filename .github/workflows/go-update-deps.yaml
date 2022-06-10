@@ -1,0 +1,42 @@
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        type: string
+        required: false
+        default: 1.18.3
+      author:
+        type: string
+        required: false
+        default: 'Bot <noreply@ectobit.com>'
+      reviewers:
+        type: string
+        required: false
+        default: acim
+
+jobs:
+  update-deps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Set up go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ inputs.go-version }}
+      - name: Check out
+        uses: actions/checkout@v3
+      - name: Update dependencies
+        run: |
+          go get -t -u ./...
+          go mod tidy
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          title: 'update dependencies'
+          branch: update-deps
+          commit-message: 'update dependencies'
+          author: ${{ inputs.author }}
+          committer: ${{ inputs.author }}
+          delete-branch: true
+          reviewers: acim
