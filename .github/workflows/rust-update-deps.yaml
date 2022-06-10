@@ -1,0 +1,67 @@
+on:
+  workflow_call:
+    inputs:
+      rust-version:
+        type: string
+        required: false
+        default: stable
+      author:
+        type: string
+        required: false
+        default: 'Bot <noreply@ectobit.com>'
+      committer:
+        type: string
+        required: false
+        default: 'Bot <noreply@ectobit.com>'
+      reviewers:
+        type: string
+        required: false
+        default: acim
+    secrets:
+      token:
+        required: false
+
+jobs:
+  update-deps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: default
+          toolchain: ${{ inputs.rust-version }}
+          override: true
+      - name: Check out
+        uses: actions/checkout@v3
+      - name: Update dependencies
+        run: |
+          cargo update --aggressive
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v4
+        env:
+          token: ${{ secrets.token }}
+        if: ${{ env.token == '' }}
+        with:
+          title: 'update dependencies'
+          branch: update-deps
+          commit-message: 'update dependencies'
+          author: ${{ inputs.author }}
+          committer: ${{ inputs.committer }}
+          delete-branch: true
+          reviewers: acim
+      - name: Create pull request using token
+        uses: peter-evans/create-pull-request@v4
+        env:
+          token: ${{ secrets.token }}
+        if: ${{ env.token != '' }}
+        with:
+          token: ${{ secrets.token }}
+          title: 'update dependencies'
+          branch: update-deps
+          commit-message: 'update dependencies'
+          author: ${{ inputs.author }}
+          committer: ${{ inputs.committer }}
+          delete-branch: true
+          reviewers: acim
