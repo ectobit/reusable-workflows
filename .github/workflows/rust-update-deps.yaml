@@ -64,4 +64,3 @@ jobs:
           author: ${{ inputs.author }}
           committer: ${{ inputs.committer }}
           delete-branch: true
-          reviewers: ${{ inputs.reviewers }}
