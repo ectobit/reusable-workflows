@@ -50,7 +50,7 @@ jobs:
           author: ${{ inputs.author }}
           committer: ${{ inputs.committer }}
           delete-branch: true
-          reviewers: acim
+          reviewers: ${{ inputs.reviewers }}
       - name: Create pull request using token
         uses: peter-evans/create-pull-request@v4
         env:
@@ -64,4 +64,4 @@ jobs:
           author: ${{ inputs.author }}
           committer: ${{ inputs.committer }}
           delete-branch: true
-          reviewers: acim
+          reviewers: ${{ inputs.reviewers }}

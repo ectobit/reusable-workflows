@@ -9,10 +9,17 @@ on:
         type: string
         required: false
         default: 'Bot <noreply@ectobit.com>'
+      committer:
+        type: string
+        required: false
+        default: 'Bot <noreply@ectobit.com>'
       reviewers:
         type: string
         required: false
         default: acim
+    secrets:
+      token:
+        required: false
 
 jobs:
   update-deps:
@@ -32,6 +39,9 @@ jobs:
           go mod tidy
       - name: Create pull request
         uses: peter-evans/create-pull-request@v4
+        env:
+          token: ${{ secrets.token }}
+        if: ${{ env.token == '' }}
         with:
           title: 'update dependencies'
           branch: update-deps
@@ -39,4 +49,18 @@ jobs:
           author: ${{ inputs.author }}
           committer: ${{ inputs.author }}
           delete-branch: true
-          reviewers: acim
+          reviewers: ${{ inputs.reviewers }}
+      - name: Create pull request using token
+        uses: peter-evans/create-pull-request@v4
+        env:
+          token: ${{ secrets.token }}
+        if: ${{ env.token != '' }}
+        with:
+          token: ${{ secrets.token }}
+          title: 'update dependencies'
+          branch: update-deps
+          commit-message: 'update dependencies'
+          author: ${{ inputs.author }}
+          committer: ${{ inputs.committer }}
+          delete-branch: true
+          reviewers: ${{ inputs.reviewers }}
