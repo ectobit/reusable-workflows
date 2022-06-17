@@ -4,43 +4,54 @@ on:
       image:
         type: string
         required: true
+        description: container image
       registry:
         type: string
         required: false
         default: ''
+        description: container registry
       platforms:
         type: string
         required: false
         default: linux/amd64,linux/arm64
+        description: platforms to build images for
       cache-type:
         type: string
         required: false
         default: registry
+        description: buildx cache type [regstry | gha]
       license:
         type: string
         required: false
         default: BSD-2-Clause-Patent
+        description: container image license
       vendor:
         type: string
         required: false
         default: ectobit.com
+        description: container image vendor
       hadolint-dockerfile:
         type: string
         required: false
         default: Dockerfile
+        description: path to container file
       hadolint-ignore:
         type: string
         required: false
         default: ''
+        description: rules to be ignored by hadolint
       build-args:
         type: string
         required: false
         default: ''
+        description: container image build arguments
     secrets:
       container-registry-username:
         required: true
+        description: username for container registry login
       container-registry-password:
         required: true
+        description: password for container registry login
     outputs:
       sha-tag:
         description: image short sha tag

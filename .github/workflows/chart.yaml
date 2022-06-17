@@ -4,17 +4,22 @@ on:
       chart:
         type: string
         required: true
+        description: chart name
       release:
         type: boolean
         required: false
         default: true
+        description: weather to release the chart to charts.ectobit.com registry
     secrets:
       helm-repo-username:
         required: false
+        description: username to use for charts registry login
       helm-repo-password:
         required: false
+        description: password to use for charts registry login
       gpg-signing-key:
         required: false
+        description: gpg key to sign chart package
 
 jobs:
   build:
@@ -38,7 +43,7 @@ jobs:
         if: ${{ inputs.release }}
         run: |
           FILE_PATH=$(helm package --sign --key 'Boban Acimovic' ${{ inputs.chart }} | awk '{print $8}')
-          FILE=$(basename ${FILE_PATH})
+          FILE=$(basename "${FILE_PATH}")
           echo "Uploading ${FILE} chart and provenance ${FILE}.prov"
           curl -u "${{ secrets.helm-repo-username }}:${{ secrets.helm-repo-password }}" \
             -F "chart=@${FILE}" \

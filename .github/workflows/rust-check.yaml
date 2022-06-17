@@ -5,6 +5,7 @@ on:
         type: string
         required: false
         default: nightly
+        description: rust version to use for checks
 
 jobs:
   check:

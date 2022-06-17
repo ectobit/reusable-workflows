@@ -4,22 +4,29 @@ on:
       image:
         type: string
         required: true
+        description: container image to deploy
       tag:
         type: string
         required: true
+        description: container image tag to deploy
       deployment-name:
         type: string
         required: true
+        description: name of the kubernetes deployment object
       container-name:
         type: string
         required: true
+        description: name of the container within the kubernetes deployment object
     secrets:
       kubernetes-server:
         required: true
+        description: kubernetes api server url
       kubernetes-token:
         required: true
+        description: kubernetes api server authentication token
       kubernetes-cert:
         required: true
+        description: kubernetes api server certificate
 
 jobs:
   deploy:

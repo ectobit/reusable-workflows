@@ -5,17 +5,21 @@ on:
         type: string
         required: false
         default: 1.18.3
+        description: go version to use for checks
       golangci-lint-version:
         type: string
         required: false
         default: v1.46.2
+        description: golangci-lint version to use for lint checks
       nancy-version:
         type: string
         required: false
         default: v1.0.36
+        description: nancy version to use for security checks
       test-command:
         type: string
         required: false
+        description: command to run tests, i.e. go test -race ./...
 
 jobs:
   check:
@@ -36,7 +40,7 @@ jobs:
             ${{ runner.os }}-go-
       - name: Set up linters
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${{ inputs.golangci-lint-version }}
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ~/go/bin ${{ inputs.golangci-lint-version }}
           curl -sSL -o /usr/local/bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/${{ inputs.nancy-version }}/nancy-${{ inputs.nancy-version }}-linux-amd64 && chmod 755 /usr/local/bin/nancy
       - name: Check out
         uses: actions/checkout@v3

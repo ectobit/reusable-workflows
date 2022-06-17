@@ -5,21 +5,26 @@ on:
         type: string
         required: false
         default: 1.18.3
+        description: go version to use to update dependencies
       author:
         type: string
         required: false
         default: 'Bot <noreply@ectobit.com>'
+        description: pull request author
       committer:
         type: string
         required: false
         default: 'Bot <noreply@ectobit.com>'
+        description: commit author
       reviewers:
         type: string
         required: false
         default: acim
+        description: persons to review the pull request
     secrets:
       token:
         required: false
+        description: personal access token to make pull request
 
 jobs:
   update-deps:
