@@ -14,7 +14,7 @@ on:
       nancy-version:
         type: string
         required: false
-        default: v1.0.38
+        default: v1.0.39
         description: nancy version to use for security checks
       test-command:
         type: string
