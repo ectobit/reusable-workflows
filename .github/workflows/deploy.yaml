@@ -9,14 +9,19 @@ on:
         type: string
         required: true
         description: container image tag to deploy
+      namespace:
+        type: string
+        required: false
+        default: default
+        description: deployment namespace
       deployment-name:
         type: string
         required: true
-        description: name of the kubernetes deployment object
+        description: deployment name
       container-name:
         type: string
         required: true
-        description: name of the container within the kubernetes deployment object
+        description: container name
     secrets:
       kubernetes-server:
         required: true
@@ -40,4 +45,4 @@ jobs:
           kubectl config set-cluster default --server=${{ secrets.kubernetes-server }} --certificate-authority=ca.crt
           kubectl config set-context default --cluster=default --user=default
           kubectl config use-context default
-          kubectl set image deployment/${{ inputs.deployment-name }} ${{ inputs.container-name }}=${{ inputs.image }}:${{ inputs.tag }}
+          kubectl set image deployment/${{ inputs.deployment-name }} ${{ inputs.container-name }}=${{ inputs.image }}:${{ inputs.tag }} -n ${{ inputs.namespace }}
