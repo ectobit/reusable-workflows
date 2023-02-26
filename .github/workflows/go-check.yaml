@@ -16,6 +16,11 @@ on:
         required: false
         default: v1.0.42
         description: nancy version to use for security checks
+      lint-command:
+        type: string
+        required: false
+        default: golangci-lint run
+        description: custom lint command
       test-command:
         type: string
         required: false
@@ -46,7 +51,7 @@ jobs:
         uses: actions/checkout@v3
       - name: Lint
         run: |
-          golangci-lint run
+          ${{ inputs.lint-command }}
           go list -json -deps | nancy sleuth
       - name: Test
         if: ${{ inputs.test-command != '' }}
