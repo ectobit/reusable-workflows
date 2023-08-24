@@ -4,12 +4,12 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.20.5
+        default: 1.21.0
         description: go version to use for checks
       golangci-lint-version:
         type: string
         required: false
-        default: v1.53.3
+        default: v1.54.2
         description: golangci-lint version to use for lint checks
       nancy-version:
         type: string
@@ -43,16 +43,18 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Set up linters
+      - name: Set up linters and vulnerabilities checkers
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ~/go/bin ${{ inputs.golangci-lint-version }}
           curl -sSL -o /usr/local/bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/${{ inputs.nancy-version }}/nancy-${{ inputs.nancy-version }}-linux-amd64 && chmod 755 /usr/local/bin/nancy
+          go install golang.org/x/vuln/cmd/govulncheck@latest
       - name: Check out
         uses: actions/checkout@v3
       - name: Lint
         run: |
           ${{ inputs.lint-command }}
           go list -json -deps | nancy sleuth
+          govulncheck ./...
       - name: Test
         if: ${{ inputs.test-command != '' }}
         run: ${{ inputs.test-command }}
