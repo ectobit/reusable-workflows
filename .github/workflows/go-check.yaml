@@ -49,7 +49,7 @@ jobs:
           curl -sSL -o /usr/local/bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/${{ inputs.nancy-version }}/nancy-${{ inputs.nancy-version }}-linux-amd64 && chmod 755 /usr/local/bin/nancy
           go install golang.org/x/vuln/cmd/govulncheck@latest
       - name: Check out
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Lint
         run: |
           ${{ inputs.lint-command }}
