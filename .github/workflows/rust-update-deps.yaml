@@ -39,7 +39,7 @@ jobs:
           toolchain: ${{ inputs.rust-version }}
           override: true
       - name: Check out
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Update dependencies
         run: |
           cargo update --aggressive

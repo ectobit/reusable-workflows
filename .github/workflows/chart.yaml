@@ -31,7 +31,7 @@ jobs:
           chmod 700 get_helm.sh
           ./get_helm.sh
       - name: Check out
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Lint
         run: helm lint ${{ inputs.chart }}
       - name: Configure GPG key
