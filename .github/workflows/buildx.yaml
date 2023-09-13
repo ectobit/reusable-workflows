@@ -115,7 +115,7 @@ jobs:
           username: ${{ secrets.container-registry-username }}
           password: ${{ secrets.container-registry-password }}
       - name: Build and push image to container registry using registry cache
-        uses: docker/build-push-action@v4.2.1
+        uses: docker/build-push-action@v5.0.0
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args == '' }}
         with:
           platforms: ${{ inputs.platforms }}
@@ -125,7 +125,7 @@ jobs:
           cache-from: type=registry,ref=${{ inputs.image }}:buildcache
           cache-to: type=registry,ref=${{ inputs.image }}:buildcache,mode=max
       - name: Build and push image with build args ${{ inputs.build-args }} to container registry using registry cache
-        uses: docker/build-push-action@v4.2.1
+        uses: docker/build-push-action@v5.0.0
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args != '' }}
         with:
           build-args: ${{ inputs.build-args }}
@@ -136,7 +136,7 @@ jobs:
           cache-from: type=registry,ref=${{ inputs.image }}:buildcache
           cache-to: type=registry,ref=${{ inputs.image }}:buildcache,mode=max
       - name: Build and push image to container registry using gha cache
-        uses: docker/build-push-action@v4.2.1
+        uses: docker/build-push-action@v5.0.0
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args == '' }}
         with:
           platforms: ${{ inputs.platforms }}
@@ -146,7 +146,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build and push image with build args ${{ inputs.build-args }} to container registry using gha cache
-        uses: docker/build-push-action@v4.2.1
+        uses: docker/build-push-action@v5.0.0
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args != '' }}
         with:
           build-args: ${{ inputs.build-args }}
