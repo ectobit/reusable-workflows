@@ -4,12 +4,12 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.21.6
+        default: 1.22.1
         description: go version to use for checks
       golangci-lint-version:
         type: string
         required: false
-        default: v1.55.2
+        default: v1.56.2
         description: golangci-lint version to use for lint checks
       nancy-version:
         type: string
