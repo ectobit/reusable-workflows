@@ -33,11 +33,9 @@ jobs:
 
     steps:
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: default
           toolchain: ${{ inputs.rust-version }}
-          override: true
       - name: Check out
         uses: actions/checkout@v4
       - name: Update dependencies
