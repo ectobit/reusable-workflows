@@ -102,13 +102,13 @@ jobs:
         id: tags
         run: echo "sha-tag=sha-$(echo ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }} | cut -c1-7)" >> "${GITHUB_OUTPUT}"
       - name: Login to Docker Hub container registry
-        uses: docker/login-action@v3.2.0
+        uses: docker/login-action@v3.3.0
         if: ${{ inputs.registry == ''}}
         with:
           username: ${{ secrets.container-registry-username }}
           password: ${{ secrets.container-registry-password }}
       - name: Login to ${{ inputs.registry }} container registry
-        uses: docker/login-action@v3.2.0
+        uses: docker/login-action@v3.3.0
         if: ${{ inputs.registry != ''}}
         with:
           registry: ${{ inputs.registry }}
