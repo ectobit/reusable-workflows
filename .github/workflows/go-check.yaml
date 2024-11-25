@@ -9,7 +9,7 @@ on:
       golangci-lint-version:
         type: string
         required: false
-        default: v1.62.0
+        default: v1.62.2
         description: golangci-lint version to use for lint checks
       nancy-version:
         type: string
