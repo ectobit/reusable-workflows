@@ -4,7 +4,7 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.24.3
+        default: 1.24.4
         description: go version to use for checks
       golangci-lint-version:
         type: string
@@ -14,7 +14,7 @@ on:
       nancy-version:
         type: string
         required: false
-        default: v1.0.48
+        default: v1.0.49
         description: nancy version to use for security checks
       lint-command:
         type: string
