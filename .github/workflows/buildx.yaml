@@ -64,7 +64,7 @@ jobs:
       sha-tag: ${{ steps.tags.outputs.sha-tag }}
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Lint Dockerfile with ignore
         if: ${{ inputs.hadolint-ignore != ''}}
         uses: hadolint/hadolint-action@v3.1.0
