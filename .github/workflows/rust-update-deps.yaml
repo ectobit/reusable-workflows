@@ -42,7 +42,7 @@ jobs:
         run: |
           cargo update --aggressive
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         env:
           token: ${{ secrets.token }}
         if: ${{ env.token == '' }}
@@ -55,7 +55,7 @@ jobs:
           delete-branch: true
           reviewers: ${{ inputs.reviewers }}
       - name: Create pull request using token
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         env:
           token: ${{ secrets.token }}
         if: ${{ env.token != '' }}
