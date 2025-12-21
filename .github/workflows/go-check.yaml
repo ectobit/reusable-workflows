@@ -20,6 +20,11 @@ on:
         type: string
         required: false
         description: command to run tests, i.e. go test -race ./...
+      go-experiment:
+        type: string
+        required: false
+        default: ''
+        description: GOEXPERIMENT environment variable for Go commands
 
 jobs:
   check:
@@ -39,15 +44,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
       - name: Set up linters and vulnerabilities checkers
+        env:
+          GOEXPERIMENT: ${{ inputs.go-experiment }}
         run: |
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ~/go/bin ${{ inputs.golangci-lint-version }}
           go install golang.org/x/vuln/cmd/govulncheck@latest
       - name: Check out
         uses: actions/checkout@v6
       - name: Lint
+        env:
+          GOEXPERIMENT: ${{ inputs.go-experiment }}
         run: |
           ${{ inputs.lint-command }}
           govulncheck ./...
       - name: Test
+        env:
+          GOEXPERIMENT: ${{ inputs.go-experiment }}
         if: ${{ inputs.test-command != '' }}
         run: ${{ inputs.test-command }}

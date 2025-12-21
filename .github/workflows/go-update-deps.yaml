@@ -21,6 +21,11 @@ on:
         required: false
         default: acim
         description: persons to review the pull request
+      go-experiment:
+        type: string
+        required: false
+        default: ''
+        description: GOEXPERIMENT environment variable for Go commands
     secrets:
       token:
         required: false
@@ -39,6 +44,8 @@ jobs:
       - name: Check out
         uses: actions/checkout@v6
       - name: Update dependencies
+        env:
+          GOEXPERIMENT: ${{ inputs.go-experiment }}
         run: |
           go get -t -u ./...
           go mod tidy
