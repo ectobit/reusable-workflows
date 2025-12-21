@@ -55,7 +55,6 @@ jobs:
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
         run: |
-          echo ${GOEXPERIMENT}
           ${{ inputs.lint-command }}
           # govulncheck ./...
       - name: Test
