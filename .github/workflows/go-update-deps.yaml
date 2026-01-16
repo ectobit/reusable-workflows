@@ -4,7 +4,7 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.25.5
+        default: 1.25.6
         description: go version to use to update dependencies
       author:
         type: string
