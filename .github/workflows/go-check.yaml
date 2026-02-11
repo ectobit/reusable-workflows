@@ -4,12 +4,12 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.25.6
+        default: 1.26.0
         description: go version to use for checks
       golangci-lint-version:
         type: string
         required: false
-        default: v2.8.0
+        default: v2.9.0
         description: golangci-lint version to use for lint checks
       lint-command:
         type: string
@@ -56,7 +56,7 @@ jobs:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
         run: |
           ${{ inputs.lint-command }}
-          # govulncheck ./...
+          govulncheck ./...
       - name: Test
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
