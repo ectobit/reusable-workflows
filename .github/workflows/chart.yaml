@@ -26,26 +26,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Helm
-        run: |
-          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3
-          chmod 700 get_helm.sh
-          ./get_helm.sh
+        uses: azure/setup-helm@v4.3.0
       - name: Check out
         uses: actions/checkout@v6
       - name: Lint
-        run: helm lint ${{ inputs.chart }}
+        env:
+          CHART: ${{ inputs.chart }}
+        run: helm lint "$CHART"
       - name: Configure GPG key
         if: ${{ inputs.release }}
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.gpg-signing-key }}
         run: |
           mkdir -p ~/.gnupg/
-          printf "${{ secrets.gpg-signing-key }}" | base64 -d > ~/.gnupg/pubring.gpg
+          printf '%s' "$GPG_SIGNING_KEY" | base64 -d > ~/.gnupg/pubring.gpg
       - name: Release
         if: ${{ inputs.release }}
+        env:
+          CHART: ${{ inputs.chart }}
+          HELM_REPO_USERNAME: ${{ secrets.helm-repo-username }}
+          HELM_REPO_PASSWORD: ${{ secrets.helm-repo-password }}
         run: |
-          FILE_PATH=$(helm package --sign --key 'Boban Acimovic' ${{ inputs.chart }} | awk '{print $8}')
+          FILE_PATH=$(helm package --sign --key 'Boban Acimovic' "$CHART" | awk '{print $8}')
           FILE=$(basename "${FILE_PATH}")
           echo "Uploading ${FILE} chart and provenance ${FILE}.prov"
-          curl -u "${{ secrets.helm-repo-username }}:${{ secrets.helm-repo-password }}" \
+          curl -u "${HELM_REPO_USERNAME}:${HELM_REPO_PASSWORD}" \
             -F "chart=@${FILE}" \
             -F "prov=@${FILE}.prov" \
             https://charts.ectobit.com/api/charts

@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate SSH tunnel secrets
-        if: ${{ inputs.ssh-tunnel-enabled }}
+        if: ${{ inputs.ssh-tunnel-enabled && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets['ssh-private-key'] }}
           SSH_KNOWN_HOSTS: ${{ secrets['ssh-known-hosts'] }}
@@ -92,7 +92,7 @@ jobs:
           fi
 
       - name: Start SSH tunnel
-        if: ${{ inputs.ssh-tunnel-enabled }}
+        if: ${{ inputs.ssh-tunnel-enabled && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets['ssh-private-key'] }}
           SSH_KNOWN_HOSTS: ${{ secrets['ssh-known-hosts'] }}
@@ -119,15 +119,23 @@ jobs:
       - name: Deploy to Kubernetes cluster
         if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
         env:
+          KUBERNETES_CERT: ${{ secrets.kubernetes-cert }}
+          KUBERNETES_SERVER: ${{ secrets.kubernetes-server }}
+          KUBERNETES_TOKEN: ${{ secrets.kubernetes-token }}
           SSH_TUNNEL_ENABLED: ${{ inputs.ssh-tunnel-enabled }}
           KUBERNETES_TLS_SERVER_NAME: ${{ secrets['kubernetes-tls-server-name'] }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment-name }}
+          CONTAINER_NAME: ${{ inputs.container-name }}
+          IMAGE: ${{ inputs.image }}
+          TAG: ${{ inputs.tag }}
+          NAMESPACE: ${{ inputs.namespace }}
         run: |
-          kubectl config set-credentials default --token=${{ secrets.kubernetes-token }}
-          echo ${{ secrets.kubernetes-cert }} | base64 -d > ca.crt
-          kubectl config set-cluster default --server=${{ secrets.kubernetes-server }} --certificate-authority=ca.crt
+          kubectl config set-credentials default --token="$KUBERNETES_TOKEN"
+          printf '%s' "$KUBERNETES_CERT" | base64 -d > ca.crt
+          kubectl config set-cluster default --server="$KUBERNETES_SERVER" --certificate-authority=ca.crt
           if [ "$SSH_TUNNEL_ENABLED" = "true" ]; then
             kubectl config set-cluster default --tls-server-name="$KUBERNETES_TLS_SERVER_NAME"
           fi
           kubectl config set-context default --cluster=default --user=default
           kubectl config use-context default
-          kubectl set image deployment/${{ inputs.deployment-name }} ${{ inputs.container-name }}=${{ inputs.image }}:${{ inputs.tag }} -n ${{ inputs.namespace }}
+          kubectl set image "deployment/${DEPLOYMENT_NAME}" "${CONTAINER_NAME}=${IMAGE}:${TAG}" -n "$NAMESPACE"
