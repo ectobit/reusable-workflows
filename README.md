@@ -7,6 +7,32 @@ Reusable GitHub Actions Workflows
 
 Please check the [.github/workflows](.github/workflows) directory
 
+## Caller-controlled execution
+
+Reusable workflows in this repository do not decide which branches, tags, or events should deploy or publish artifacts. Caller workflows should express that policy with their own `on`, `if`, and input values.
+
+For example, `buildx.yaml` pushes images when its `push` input is `true`. To keep pull requests as build-only checks, set `push` from the caller workflow:
+
+```yaml
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+jobs:
+  build:
+    uses: ectobit/reusable-workflows/.github/workflows/buildx.yaml@main
+    with:
+      image: example/image
+      push: ${{ github.event_name != 'pull_request' }}
+    secrets:
+      container-registry-username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
+      container-registry-password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+```
+
+Compatibility note: `buildx.yaml` previously skipped pushing automatically on `pull_request` events. Callers should now set `push` explicitly when they want event-specific publishing behavior.
+
 ## Kubernetes deployment secrets
 
 `deploy.yaml` requires these Kubernetes secrets from the caller:
@@ -124,8 +150,14 @@ Store the resulting values as GitHub Actions secrets. Do not print tokens, kubec
 `deploy.yaml` can optionally deploy to a Kubernetes cluster through an SSH tunnel. Existing callers do not need to change anything unless they opt in.
 
 ```yaml
+on:
+  push:
+    branches:
+    - main
+
 jobs:
   deploy:
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     uses: ectobit/reusable-workflows/.github/workflows/deploy.yaml@main
     with:
       ssh-tunnel-enabled: true
@@ -139,6 +171,8 @@ jobs:
       ssh-tunnel-target-host: ${{ secrets.SSH_TUNNEL_TARGET_HOST }}
       ssh-tunnel-target-port: ${{ secrets.SSH_TUNNEL_TARGET_PORT }}
 ```
+
+The caller workflow decides when deployment runs. `deploy.yaml` does not restrict deployment to a specific branch or event.
 
 When the tunnel is enabled, the caller's `kubernetes-server` secret must point to the local tunnel endpoint, and `kubernetes-tls-server-name` must contain the Kubernetes API certificate name. The `SSH_TUNNEL_*` secrets are only needed when `ssh-tunnel-enabled` is `true`.
 

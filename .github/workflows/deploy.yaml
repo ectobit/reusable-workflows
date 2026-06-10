@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate SSH tunnel secrets
-        if: ${{ inputs.ssh-tunnel-enabled && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+        if: ${{ inputs.ssh-tunnel-enabled }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets['ssh-private-key'] }}
           SSH_KNOWN_HOSTS: ${{ secrets['ssh-known-hosts'] }}
@@ -92,7 +92,7 @@ jobs:
           fi
 
       - name: Start SSH tunnel
-        if: ${{ inputs.ssh-tunnel-enabled && github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+        if: ${{ inputs.ssh-tunnel-enabled }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets['ssh-private-key'] }}
           SSH_KNOWN_HOSTS: ${{ secrets['ssh-known-hosts'] }}
@@ -117,7 +117,6 @@ jobs:
             "${SSH_TUNNEL_USER}@${SSH_TUNNEL_HOST}"
 
       - name: Deploy to Kubernetes cluster
-        if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
         env:
           KUBERNETES_CERT: ${{ secrets.kubernetes-cert }}
           KUBERNETES_SERVER: ${{ secrets.kubernetes-server }}

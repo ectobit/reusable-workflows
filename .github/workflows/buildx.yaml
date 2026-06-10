@@ -45,6 +45,11 @@ on:
         required: false
         default: ''
         description: container image build arguments
+      push:
+        type: boolean
+        required: false
+        default: true
+        description: whether to push the container image
     secrets:
       container-registry-username:
         required: true
@@ -119,7 +124,7 @@ jobs:
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args == '' }}
         with:
           platforms: ${{ inputs.platforms }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ inputs.image }}:buildcache
@@ -130,7 +135,7 @@ jobs:
         with:
           build-args: ${{ inputs.build-args }}
           platforms: ${{ inputs.platforms }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ inputs.image }}:buildcache
@@ -140,7 +145,7 @@ jobs:
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args == '' }}
         with:
           platforms: ${{ inputs.platforms }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -151,7 +156,7 @@ jobs:
         with:
           build-args: ${{ inputs.build-args }}
           platforms: ${{ inputs.platforms }}
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
