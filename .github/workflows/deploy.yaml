@@ -22,6 +22,11 @@ on:
         type: string
         required: true
         description: container name
+      ssh-tunnel-enabled:
+        type: boolean
+        required: false
+        default: false
+        description: enable SSH tunnel for Kubernetes API access
     secrets:
       kubernetes-server:
         required: true
@@ -32,17 +37,97 @@ on:
       kubernetes-cert:
         required: true
         description: kubernetes api server certificate
+      kubernetes-tls-server-name:
+        required: false
+        description: kubernetes TLS server name used when ssh-tunnel-enabled is true
+      ssh-private-key:
+        required: false
+        description: SSH private key used when ssh-tunnel-enabled is true
+      ssh-known-hosts:
+        required: false
+        description: SSH known_hosts entry used when ssh-tunnel-enabled is true
+      ssh-tunnel-host:
+        required: false
+        description: SSH tunnel host used when ssh-tunnel-enabled is true
+      ssh-tunnel-user:
+        required: false
+        description: SSH tunnel user used when ssh-tunnel-enabled is true
+      ssh-tunnel-local-port:
+        required: false
+        description: SSH tunnel local port used when ssh-tunnel-enabled is true
+      ssh-tunnel-target-host:
+        required: false
+        description: SSH tunnel target host used when ssh-tunnel-enabled is true
+      ssh-tunnel-target-port:
+        required: false
+        description: SSH tunnel target port used when ssh-tunnel-enabled is true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate SSH tunnel secrets
+        if: ${{ inputs.ssh-tunnel-enabled }}
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets['ssh-private-key'] }}
+          SSH_KNOWN_HOSTS: ${{ secrets['ssh-known-hosts'] }}
+          SSH_TUNNEL_HOST: ${{ secrets['ssh-tunnel-host'] }}
+          SSH_TUNNEL_USER: ${{ secrets['ssh-tunnel-user'] }}
+          SSH_TUNNEL_LOCAL_PORT: ${{ secrets['ssh-tunnel-local-port'] }}
+          SSH_TUNNEL_TARGET_HOST: ${{ secrets['ssh-tunnel-target-host'] }}
+          SSH_TUNNEL_TARGET_PORT: ${{ secrets['ssh-tunnel-target-port'] }}
+          KUBERNETES_TLS_SERVER_NAME: ${{ secrets['kubernetes-tls-server-name'] }}
+        run: |
+          if [ -z "$SSH_PRIVATE_KEY" ] || [ -z "$SSH_KNOWN_HOSTS" ]; then
+            echo "::error::ssh-private-key and ssh-known-hosts secrets are required when ssh-tunnel-enabled is true."
+            exit 1
+          fi
+          if [ -z "$SSH_TUNNEL_HOST" ] || [ -z "$SSH_TUNNEL_USER" ] || [ -z "$SSH_TUNNEL_LOCAL_PORT" ] || [ -z "$SSH_TUNNEL_TARGET_HOST" ] || [ -z "$SSH_TUNNEL_TARGET_PORT" ]; then
+            echo "::error::ssh-tunnel-host, ssh-tunnel-user, ssh-tunnel-local-port, ssh-tunnel-target-host, and ssh-tunnel-target-port secrets are required when ssh-tunnel-enabled is true."
+            exit 1
+          fi
+          if [ -z "$KUBERNETES_TLS_SERVER_NAME" ]; then
+            echo "::error::kubernetes-tls-server-name secret is required when ssh-tunnel-enabled is true."
+            exit 1
+          fi
+
+      - name: Start SSH tunnel
+        if: ${{ inputs.ssh-tunnel-enabled }}
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets['ssh-private-key'] }}
+          SSH_KNOWN_HOSTS: ${{ secrets['ssh-known-hosts'] }}
+          SSH_TUNNEL_HOST: ${{ secrets['ssh-tunnel-host'] }}
+          SSH_TUNNEL_USER: ${{ secrets['ssh-tunnel-user'] }}
+          SSH_TUNNEL_LOCAL_PORT: ${{ secrets['ssh-tunnel-local-port'] }}
+          SSH_TUNNEL_TARGET_HOST: ${{ secrets['ssh-tunnel-target-host'] }}
+          SSH_TUNNEL_TARGET_PORT: ${{ secrets['ssh-tunnel-target-port'] }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/ssh_tunnel_deploy_key
+          chmod 600 ~/.ssh/ssh_tunnel_deploy_key
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh -fN \
+            -i ~/.ssh/ssh_tunnel_deploy_key \
+            -o ExitOnForwardFailure=yes \
+            -o ServerAliveInterval=30 \
+            -o StrictHostKeyChecking=yes \
+            -L "127.0.0.1:${SSH_TUNNEL_LOCAL_PORT}:${SSH_TUNNEL_TARGET_HOST}:${SSH_TUNNEL_TARGET_PORT}" \
+            "${SSH_TUNNEL_USER}@${SSH_TUNNEL_HOST}"
+
       - name: Deploy to Kubernetes cluster
         if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+        env:
+          SSH_TUNNEL_ENABLED: ${{ inputs.ssh-tunnel-enabled }}
+          KUBERNETES_TLS_SERVER_NAME: ${{ secrets['kubernetes-tls-server-name'] }}
         run: |
           kubectl config set-credentials default --token=${{ secrets.kubernetes-token }}
           echo ${{ secrets.kubernetes-cert }} | base64 -d > ca.crt
           kubectl config set-cluster default --server=${{ secrets.kubernetes-server }} --certificate-authority=ca.crt
+          if [ "$SSH_TUNNEL_ENABLED" = "true" ]; then
+            kubectl config set-cluster default --tls-server-name="$KUBERNETES_TLS_SERVER_NAME"
+          fi
           kubectl config set-context default --cluster=default --user=default
           kubectl config use-context default
           kubectl set image deployment/${{ inputs.deployment-name }} ${{ inputs.container-name }}=${{ inputs.image }}:${{ inputs.tag }} -n ${{ inputs.namespace }}
