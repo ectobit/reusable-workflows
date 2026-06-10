@@ -9,9 +9,9 @@ Please check the [.github/workflows](.github/workflows) directory
 
 ## Caller-controlled execution
 
-Reusable workflows in this repository do not decide which branches, tags, or events should deploy or publish artifacts. Caller workflows should express that policy with their own `on`, `if`, and input values.
+Reusable workflows in this repository do not decide which branches, tags, or events should deploy or publish artifacts. Caller workflows should express that policy with their own `on` and `if` conditions.
 
-For example, `buildx.yaml` pushes images when its `push` input is `true`. To keep pull requests as build-only checks, set `push` from the caller workflow:
+For example, `buildx.yaml` pushes an image whenever it runs. To publish only from `main`, call it only from a job that is allowed to publish:
 
 ```yaml
 on:
@@ -22,16 +22,14 @@ on:
 
 jobs:
   build:
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     uses: ectobit/reusable-workflows/.github/workflows/buildx.yaml@main
     with:
       image: example/image
-      push: ${{ github.event_name != 'pull_request' }}
     secrets:
       container-registry-username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
       container-registry-password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 ```
-
-Compatibility note: `buildx.yaml` previously skipped pushing automatically on `pull_request` events. Callers should now set `push` explicitly when they want event-specific publishing behavior.
 
 ## Kubernetes deployment secrets
 
