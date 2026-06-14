@@ -16,11 +16,11 @@ on:
         required: false
         default: 'Bot <noreply@ectobit.com>'
         description: commit author
-      reviewers:
+      assignees:
         type: string
         required: false
         default: acim
-        description: persons to review the pull request
+        description: persons to assign the pull request to
       go-experiment:
         type: string
         required: false
@@ -61,7 +61,7 @@ jobs:
           author: ${{ inputs.author }}
           committer: ${{ inputs.committer }}
           delete-branch: true
-          reviewers: ${{ inputs.reviewers }}
+          assignees: ${{ inputs.assignees }}
       - name: Create pull request using token
         uses: peter-evans/create-pull-request@v8
         env:
@@ -75,4 +75,4 @@ jobs:
           author: ${{ inputs.author }}
           committer: ${{ inputs.committer }}
           delete-branch: true
-          reviewers: ${{ inputs.reviewers }}
+          assignees: ${{ inputs.assignees }}
