@@ -31,6 +31,44 @@ jobs:
       container-registry-password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 ```
 
+## Build container images
+
+By default, `buildx.yaml` builds from the repository root with `Dockerfile`. Existing callers can keep using only the original inputs:
+
+```yaml
+jobs:
+  build:
+    uses: ectobit/reusable-workflows/.github/workflows/buildx.yaml@main
+    with:
+      image: example/image
+    secrets:
+      container-registry-username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
+      container-registry-password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+```
+
+Callers with a Dockerfile in a subfolder can set the build context and Dockerfile path explicitly. Hadolint uses the selected `dockerfile`.
+
+```yaml
+jobs:
+  build:
+    uses: ectobit/reusable-workflows/.github/workflows/buildx.yaml@main
+    with:
+      image: acim/maia
+      context: .
+      dockerfile: backend/Dockerfile
+    secrets:
+      container-registry-username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
+      container-registry-password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
+```
+
+Breaking change: `hadolint-dockerfile` has been removed. Callers that used it must switch to `dockerfile`, which is now shared by hadolint and Docker Buildx:
+
+```yaml
+with:
+  image: example/image
+  dockerfile: backend/Dockerfile
+```
+
 ## Kubernetes deployment secrets
 
 `deploy.yaml` requires these Kubernetes secrets from the caller:

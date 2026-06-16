@@ -15,6 +15,16 @@ on:
         required: false
         default: linux/amd64,linux/arm64
         description: platforms to build images for
+      context:
+        type: string
+        required: false
+        default: .
+        description: Docker build context
+      dockerfile:
+        type: string
+        required: false
+        default: Dockerfile
+        description: path to Dockerfile
       push:
         type: boolean
         required: false
@@ -35,11 +45,6 @@ on:
         required: false
         default: ectobit.com
         description: container image vendor
-      hadolint-dockerfile:
-        type: string
-        required: false
-        default: Dockerfile
-        description: path to container file
       hadolint-ignore:
         type: string
         required: false
@@ -74,13 +79,13 @@ jobs:
         if: ${{ inputs.hadolint-ignore != ''}}
         uses: hadolint/hadolint-action@v3.3.0
         with:
-          dockerfile: ${{ inputs.hadolint-dockerfile }}
+          dockerfile: ${{ inputs.dockerfile }}
           ignore: ${{ inputs.hadolint-ignore }}
       - name: Lint Dockerfile
         if: ${{ inputs.hadolint-ignore == ''}}
         uses: hadolint/hadolint-action@v3.3.0
         with:
-          dockerfile: ${{ inputs.hadolint-dockerfile }}
+          dockerfile: ${{ inputs.dockerfile }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx
@@ -123,6 +128,8 @@ jobs:
         uses: docker/build-push-action@v7.2.0
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args == '' }}
         with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -133,6 +140,8 @@ jobs:
         uses: docker/build-push-action@v7.2.0
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args != '' }}
         with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
           build-args: ${{ inputs.build-args }}
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
@@ -144,6 +153,8 @@ jobs:
         uses: docker/build-push-action@v7.2.0
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args == '' }}
         with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -154,6 +165,8 @@ jobs:
         uses: docker/build-push-action@v7.2.0
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args != '' }}
         with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
           build-args: ${{ inputs.build-args }}
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
