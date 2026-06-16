@@ -12,6 +12,4 @@ jobs:
       - name: Check out
         uses: actions/checkout@v6
       - name: Check workflow files
-        uses: reviewdog/action-actionlint@v1
-        with:
-          fail_level: error
+        uses: raven-actions/actionlint@v2

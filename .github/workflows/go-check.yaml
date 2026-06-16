@@ -11,6 +11,11 @@ on:
         required: false
         default: v2.12.2
         description: golangci-lint version to use for lint checks
+      govulncheck-version:
+        type: string
+        required: false
+        default: v1.1.4
+        description: govulncheck version to use for vulnerability checks
       lint-command:
         type: string
         required: false
@@ -34,7 +39,9 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ inputs.go-version }}
-      - name: Set up cache
+      - name: Check out
+        uses: actions/checkout@v6
+      - name: Set up go cache
         uses: actions/cache@v5
         with:
           path: |
@@ -43,22 +50,50 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Set up tools path
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Set up tools cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.local/bin
+          key: ${{ runner.os }}-go-tools-${{ inputs.go-version }}-${{ inputs.golangci-lint-version }}-${{ inputs.govulncheck-version }}
       - name: Set up linters and vulnerabilities checkers
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
           GOLANGCI_LINT_VERSION: ${{ inputs.golangci-lint-version }}
+          GOVULNCHECK_VERSION: ${{ inputs.govulncheck-version }}
         run: |
-          case "$GOLANGCI_LINT_VERSION" in
-            v2.*)
-              go install "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
-              ;;
-            *)
-              go install "github.com/golangci/golangci-lint/cmd/golangci-lint@$GOLANGCI_LINT_VERSION"
-              ;;
-          esac
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-      - name: Check out
-        uses: actions/checkout@v6
+          set -euo pipefail
+
+          TOOL_BIN="$HOME/.local/bin"
+
+          if [ ! -x "$TOOL_BIN/golangci-lint" ]; then
+            version="${GOLANGCI_LINT_VERSION#v}"
+            os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+            arch="$(uname -m)"
+            case "$arch" in
+              x86_64) arch="amd64" ;;
+              aarch64) arch="arm64" ;;
+            esac
+
+            archive="golangci-lint-${version}-${os}-${arch}.tar.gz"
+            checksums="golangci-lint-${version}-checksums.txt"
+            base_url="https://github.com/golangci/golangci-lint/releases/download/${GOLANGCI_LINT_VERSION}"
+            tmpdir="$(mktemp -d)"
+            trap 'rm -rf "$tmpdir"' EXIT
+
+            curl -fsSLo "$tmpdir/$archive" "$base_url/$archive"
+            curl -fsSLo "$tmpdir/$checksums" "$base_url/$checksums"
+            grep "$archive$" "$tmpdir/$checksums" | (cd "$tmpdir" && sha256sum -c -)
+            tar -xzf "$tmpdir/$archive" -C "$tmpdir"
+            install "$tmpdir/golangci-lint-${version}-${os}-${arch}/golangci-lint" "$TOOL_BIN/golangci-lint"
+          fi
+
+          if [ ! -x "$TOOL_BIN/govulncheck" ]; then
+            GOBIN="$TOOL_BIN" go install "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION"
+          fi
       - name: Lint
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
