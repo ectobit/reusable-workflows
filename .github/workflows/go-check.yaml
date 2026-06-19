@@ -101,6 +101,10 @@ jobs:
         run: |
           bash -eo pipefail -c "$LINT_COMMAND"
           govulncheck ./...
+      - name: Go fix
+        env:
+          GOEXPERIMENT: ${{ inputs.go-experiment }}
+        run: go fix -diff ./...
       - name: Test
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
