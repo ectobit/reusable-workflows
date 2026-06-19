@@ -40,7 +40,7 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
       - name: Check out
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Set up go cache
         uses: actions/cache@v5
         with:

@@ -42,7 +42,7 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
       - name: Check out
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Update dependencies
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
