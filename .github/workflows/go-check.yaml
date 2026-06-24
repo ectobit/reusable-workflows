@@ -42,7 +42,7 @@ jobs:
       - name: Check out
         uses: actions/checkout@v7
       - name: Set up go cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/go-build
@@ -55,7 +55,7 @@ jobs:
           mkdir -p "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Set up tools cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.local/bin
           key: ${{ runner.os }}-go-tools-${{ inputs.go-version }}-${{ inputs.golangci-lint-version }}-${{ inputs.govulncheck-version }}
