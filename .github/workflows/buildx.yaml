@@ -125,7 +125,7 @@ jobs:
           username: ${{ secrets.container-registry-username }}
           password: ${{ secrets.container-registry-password }}
       - name: Build and push image to container registry using registry cache
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args == '' }}
         with:
           context: ${{ inputs.context }}
@@ -137,7 +137,7 @@ jobs:
           cache-from: type=registry,ref=${{ inputs.image }}:buildcache
           cache-to: ${{ inputs.push && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || 'type=gha,mode=max' }}
       - name: Build and push image with build args ${{ inputs.build-args }} to container registry using registry cache
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.cache-type == 'registry' && inputs.build-args != '' }}
         with:
           context: ${{ inputs.context }}
@@ -150,7 +150,7 @@ jobs:
           cache-from: type=registry,ref=${{ inputs.image }}:buildcache
           cache-to: ${{ inputs.push && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || 'type=gha,mode=max' }}
       - name: Build and push image to container registry using gha cache
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args == '' }}
         with:
           context: ${{ inputs.context }}
@@ -162,7 +162,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Build and push image with build args ${{ inputs.build-args }} to container registry using gha cache
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.cache-type == 'gha' && inputs.build-args != '' }}
         with:
           context: ${{ inputs.context }}
