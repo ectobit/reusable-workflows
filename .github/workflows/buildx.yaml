@@ -50,6 +50,16 @@ on:
         required: false
         default: ''
         description: rules to be ignored by hadolint
+      hadolint:
+        type: boolean
+        required: false
+        default: true
+        description: whether to lint the Dockerfile with hadolint
+      hadolint-failure-threshold:
+        type: string
+        required: false
+        default: info
+        description: Hadolint rule severity threshold for pipeline failure
       build-args:
         type: string
         required: false
@@ -76,16 +86,18 @@ jobs:
       - name: Check out
         uses: actions/checkout@v7
       - name: Lint Dockerfile with ignore
-        if: ${{ inputs.hadolint-ignore != ''}}
+        if: ${{ inputs.hadolint && inputs.hadolint-ignore != ''}}
         uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: ${{ inputs.dockerfile }}
+          failure-threshold: ${{ inputs.hadolint-failure-threshold }}
           ignore: ${{ inputs.hadolint-ignore }}
       - name: Lint Dockerfile
-        if: ${{ inputs.hadolint-ignore == ''}}
+        if: ${{ inputs.hadolint && inputs.hadolint-ignore == ''}}
         uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: ${{ inputs.dockerfile }}
+          failure-threshold: ${{ inputs.hadolint-failure-threshold }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx

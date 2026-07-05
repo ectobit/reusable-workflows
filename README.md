@@ -61,6 +61,22 @@ jobs:
       container-registry-password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 ```
 
+Hadolint runs by default. Callers that already lint the Dockerfile in an earlier CI gate can skip the internal Hadolint step:
+
+```yaml
+with:
+  image: example/image
+  hadolint: false
+```
+
+Callers that keep internal Hadolint enabled can set the Hadolint failure threshold. The default is `info`, matching the current Hadolint action behavior. Valid values are `error`, `warning`, `info`, `style`, and `ignore`.
+
+```yaml
+with:
+  image: example/image
+  hadolint-failure-threshold: warning
+```
+
 Breaking change: `hadolint-dockerfile` has been removed. Callers that used it must switch to `dockerfile`, which is now shared by hadolint and Docker Buildx:
 
 ```yaml
