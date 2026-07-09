@@ -27,6 +27,26 @@ on:
         required: false
         default: false
         description: enable SSH tunnel for Kubernetes API access
+      concurrency-group:
+        type: string
+        required: false
+        default: ''
+        description: optional deployment concurrency group
+      cancel-in-progress:
+        type: boolean
+        required: false
+        default: false
+        description: whether to cancel an in-progress deployment in the same concurrency group
+      verify-rollout:
+        type: boolean
+        required: false
+        default: true
+        description: whether to wait for deployment rollout after setting the image
+      rollout-timeout:
+        type: string
+        required: false
+        default: 5m
+        description: kubectl rollout status timeout
     secrets:
       kubernetes-server:
         required: true
@@ -62,9 +82,15 @@ on:
         required: false
         description: SSH tunnel target port used when ssh-tunnel-enabled is true
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ inputs.concurrency-group != '' && inputs.concurrency-group || format('{0}-{1}', github.workflow, github.run_id) }}
+      cancel-in-progress: ${{ inputs.cancel-in-progress }}
     steps:
       - name: Validate SSH tunnel secrets
         if: ${{ inputs.ssh-tunnel-enabled }}
@@ -128,6 +154,8 @@ jobs:
           IMAGE: ${{ inputs.image }}
           TAG: ${{ inputs.tag }}
           NAMESPACE: ${{ inputs.namespace }}
+          ROLLOUT_TIMEOUT: ${{ inputs.rollout-timeout }}
+          VERIFY_ROLLOUT: ${{ inputs.verify-rollout }}
         run: |
           kubectl config set-credentials default --token="$KUBERNETES_TOKEN"
           printf '%s' "$KUBERNETES_CERT" | base64 -d > ca.crt
@@ -135,6 +163,9 @@ jobs:
           if [ "$SSH_TUNNEL_ENABLED" = "true" ]; then
             kubectl config set-cluster default --tls-server-name="$KUBERNETES_TLS_SERVER_NAME"
           fi
-          kubectl config set-context default --cluster=default --user=default
+          kubectl config set-context default --cluster=default --user=default --namespace="$NAMESPACE"
           kubectl config use-context default
           kubectl set image "deployment/${DEPLOYMENT_NAME}" "${CONTAINER_NAME}=${IMAGE}:${TAG}" -n "$NAMESPACE"
+          if [ "$VERIFY_ROLLOUT" = "true" ]; then
+            kubectl rollout status "deployment/${DEPLOYMENT_NAME}" -n "$NAMESPACE" --timeout="$ROLLOUT_TIMEOUT"
+          fi

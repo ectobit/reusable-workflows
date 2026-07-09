@@ -16,20 +16,49 @@ on:
         required: false
         default: v1.1.4
         description: govulncheck version to use for vulnerability checks
+      working-directory:
+        type: string
+        required: false
+        default: .
+        description: working directory for Go commands
       lint-command:
         type: string
         required: false
         default: golangci-lint run
         description: custom lint command
+      extra-check-command:
+        type: string
+        required: false
+        default: ''
+        description: optional extra check command to run after linting
       test-command:
         type: string
         required: false
+        default: ''
         description: command to run tests, i.e. go test -race ./...
+      vulncheck:
+        type: boolean
+        required: false
+        default: true
+        description: whether to run govulncheck ./...
+      go-fix-check:
+        type: boolean
+        required: false
+        default: true
+        description: whether to run go fix -diff ./...
       go-experiment:
         type: string
         required: false
         default: ''
         description: GOEXPERIMENT environment variable for Go commands
+      go-toolchain:
+        type: string
+        required: false
+        default: auto
+        description: GOTOOLCHAIN environment variable for Go commands
+
+permissions:
+  contents: read
 
 jobs:
   check:
@@ -48,8 +77,9 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ hashFiles('**/go.mod', '**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ inputs.working-directory }}-${{ hashFiles('**/go.mod', '**/go.sum') }}
           restore-keys: |
+            ${{ runner.os }}-go-${{ inputs.go-version }}-${{ inputs.working-directory }}-
             ${{ runner.os }}-go-${{ inputs.go-version }}-
             ${{ runner.os }}-go-
       - name: Set up tools path
@@ -61,10 +91,11 @@ jobs:
         with:
           path: ~/.local/bin
           key: ${{ runner.os }}-go-tools-${{ inputs.go-version }}-${{ inputs.golangci-lint-version }}-${{ inputs.govulncheck-version }}
-      - name: Set up linters and vulnerabilities checkers
+      - name: Set up linters and vulnerability checkers
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
           GOLANGCI_LINT_VERSION: ${{ inputs.golangci-lint-version }}
+          GOTOOLCHAIN: ${{ inputs.go-toolchain }}
           GOVULNCHECK_VERSION: ${{ inputs.govulncheck-version }}
         run: |
           set -euo pipefail
@@ -97,19 +128,39 @@ jobs:
             GOBIN="$TOOL_BIN" go install "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION"
           fi
       - name: Lint
+        working-directory: ${{ inputs.working-directory }}
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
+          GOTOOLCHAIN: ${{ inputs.go-toolchain }}
           LINT_COMMAND: ${{ inputs.lint-command }}
-        run: |
-          bash -eo pipefail -c "$LINT_COMMAND"
-          govulncheck ./...
-      - name: Go fix
+        run: bash -eo pipefail -c "$LINT_COMMAND"
+      - name: Extra checks
+        working-directory: ${{ inputs.working-directory }}
+        if: ${{ inputs.extra-check-command != '' }}
+        env:
+          EXTRA_CHECK_COMMAND: ${{ inputs.extra-check-command }}
+          GOEXPERIMENT: ${{ inputs.go-experiment }}
+          GOTOOLCHAIN: ${{ inputs.go-toolchain }}
+        run: bash -eo pipefail -c "$EXTRA_CHECK_COMMAND"
+      - name: Vulnerability check
+        working-directory: ${{ inputs.working-directory }}
+        if: ${{ inputs.vulncheck }}
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
+          GOTOOLCHAIN: ${{ inputs.go-toolchain }}
+        run: govulncheck ./...
+      - name: Go fix
+        working-directory: ${{ inputs.working-directory }}
+        if: ${{ inputs.go-fix-check }}
+        env:
+          GOEXPERIMENT: ${{ inputs.go-experiment }}
+          GOTOOLCHAIN: ${{ inputs.go-toolchain }}
         run: go fix -diff ./...
       - name: Test
+        working-directory: ${{ inputs.working-directory }}
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
+          GOTOOLCHAIN: ${{ inputs.go-toolchain }}
           TEST_COMMAND: ${{ inputs.test-command }}
         if: ${{ inputs.test-command != '' }}
         run: bash -eo pipefail -c "$TEST_COMMAND"

@@ -77,12 +77,96 @@ with:
   hadolint-failure-threshold: warning
 ```
 
+`buildx.yaml` can also scan the built image with Grype before pushing it. This mode builds the image once into the local Docker engine, scans that same image, and only pushes the scanned tags when the scan passes. Because the scanned image is loaded locally, this mode supports one platform at a time. Multi-platform callers should keep `grype: false` or split scans by platform.
+
+```yaml
+with:
+  image: ghcr.io/example/app
+  registry: ghcr.io
+  platforms: linux/amd64
+  grype: true
+  grype-sarif-artifact-name: app-grype-sarif
+```
+
+Set `grype-fail-build: false` only for an explicit temporary risk acceptance. The scan still runs and uploads SARIF when available, but findings do not fail the workflow.
+
+```yaml
+with:
+  image: ghcr.io/example/app
+  grype: true
+  grype-fail-build: false
+```
+
 Breaking change: `hadolint-dockerfile` has been removed. Callers that used it must switch to `dockerfile`, which is now shared by hadolint and Docker Buildx:
 
 ```yaml
 with:
   image: example/image
   dockerfile: backend/Dockerfile
+```
+
+## Check Go projects
+
+`go-check.yaml` runs a Go lint command, optional extra checks, optional `govulncheck`, optional `go fix -diff`, and an optional test command. Use `working-directory` for repositories where Go code is not at the repository root.
+
+```yaml
+jobs:
+  backend-check:
+    uses: ectobit/reusable-workflows/.github/workflows/go-check.yaml@main
+    with:
+      working-directory: backend
+      lint-command: make lint
+      extra-check-command: make openapi-check
+      govulncheck-version: latest
+      go-experiment: jsonv2
+      go-toolchain: local
+      go-fix-check: false
+```
+
+## Check and release Helm charts
+
+`chart.yaml` can run Helm lint, a default `helm template`, caller-supplied render/check commands, and optional chart publishing. Existing ChartMuseum callers continue to work. OCI publishing is available with `release-target: oci`.
+
+```yaml
+jobs:
+  chart-check:
+    uses: ectobit/reusable-workflows/.github/workflows/chart.yaml@main
+    with:
+      chart: charts/example
+      release: false
+      render-release-name: example
+      check-command: sh charts/example/tests/render-contract.sh
+
+  chart-release:
+    uses: ectobit/reusable-workflows/.github/workflows/chart.yaml@main
+    with:
+      chart: charts/example
+      release: true
+      lint: false
+      package-version: 1.2.${{ github.run_number }}
+      app-version: main
+      release-target: oci
+      registry: ghcr.io
+      oci-repository: oci://ghcr.io/example/charts
+      sign: false
+    secrets:
+      helm-repo-username: ${{ github.actor }}
+      helm-repo-password: ${{ secrets.GITHUB_TOKEN }}
+```
+
+## Deploy Kubernetes images
+
+`deploy.yaml` updates one Kubernetes Deployment container image with `kubectl set image`. It supports SSH tunneling, optional deployment concurrency, and rollout waiting. Callers with Helm-based releases or custom smoke tests should keep those workflows custom instead of using this simple deployment helper.
+
+```yaml
+with:
+  image: ghcr.io/example/app
+  tag: sha-1234567
+  namespace: default
+  deployment-name: app
+  container-name: app
+  concurrency-group: production-app-deploy
+  verify-rollout: true
 ```
 
 ## Kubernetes deployment secrets

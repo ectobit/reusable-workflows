@@ -4,19 +4,84 @@ on:
       chart:
         type: string
         required: true
-        description: chart name
+        description: chart path
       release:
         type: boolean
         required: false
         default: true
-        description: weather to release the chart to charts.ectobit.com registry
+        description: whether to release the packaged chart
+      lint:
+        type: boolean
+        required: false
+        default: true
+        description: whether to run helm lint
+      render-release-name:
+        type: string
+        required: false
+        default: ''
+        description: release name used for the default helm template check
+      render-command:
+        type: string
+        required: false
+        default: ''
+        description: optional custom render command
+      check-command:
+        type: string
+        required: false
+        default: ''
+        description: optional additional chart check command
+      package-destination:
+        type: string
+        required: false
+        default: dist
+        description: directory for packaged chart output
+      package-version:
+        type: string
+        required: false
+        default: ''
+        description: optional chart package version override
+      app-version:
+        type: string
+        required: false
+        default: ''
+        description: optional chart app version override
+      release-target:
+        type: string
+        required: false
+        default: chartmuseum
+        description: release target [chartmuseum | oci]
+      chartmuseum-url:
+        type: string
+        required: false
+        default: https://charts.ectobit.com/api/charts
+        description: ChartMuseum-compatible upload URL
+      oci-repository:
+        type: string
+        required: false
+        default: ''
+        description: OCI repository, for example oci://ghcr.io/acim/charts
+      registry:
+        type: string
+        required: false
+        default: ''
+        description: OCI registry host used for helm registry login
+      sign:
+        type: boolean
+        required: false
+        default: true
+        description: whether to sign ChartMuseum packages with GPG
+      gpg-key-name:
+        type: string
+        required: false
+        default: Boban Acimovic
+        description: GPG key name used when sign is true
     secrets:
       helm-repo-username:
         required: false
-        description: username to use for charts registry login
+        description: username to use for chart registry login
       helm-repo-password:
         required: false
-        description: password to use for charts registry login
+        description: password to use for chart registry login
       gpg-signing-key:
         required: false
         description: gpg key to sign chart package
@@ -30,27 +95,90 @@ jobs:
       - name: Check out
         uses: actions/checkout@v7
       - name: Lint
+        if: ${{ inputs.lint }}
         env:
           CHART: ${{ inputs.chart }}
         run: helm lint "$CHART"
+      - name: Render
+        if: ${{ inputs.render-release-name != '' }}
+        env:
+          CHART: ${{ inputs.chart }}
+          RELEASE_NAME: ${{ inputs.render-release-name }}
+        run: helm template "$RELEASE_NAME" "$CHART"
+      - name: Custom render
+        if: ${{ inputs.render-command != '' }}
+        env:
+          RENDER_COMMAND: ${{ inputs.render-command }}
+        run: bash -eo pipefail -c "$RENDER_COMMAND"
+      - name: Additional chart checks
+        if: ${{ inputs.check-command != '' }}
+        env:
+          CHECK_COMMAND: ${{ inputs.check-command }}
+        run: bash -eo pipefail -c "$CHECK_COMMAND"
       - name: Configure GPG key
-        if: ${{ inputs.release }}
+        if: ${{ inputs.release && inputs.sign }}
         env:
           GPG_SIGNING_KEY: ${{ secrets.gpg-signing-key }}
         run: |
           mkdir -p ~/.gnupg/
           printf '%s' "$GPG_SIGNING_KEY" | base64 -d > ~/.gnupg/pubring.gpg
-      - name: Release
+      - name: Package chart
         if: ${{ inputs.release }}
+        id: package
         env:
+          APP_VERSION: ${{ inputs.app-version }}
           CHART: ${{ inputs.chart }}
+          DESTINATION: ${{ inputs.package-destination }}
+          GPG_KEY_NAME: ${{ inputs.gpg-key-name }}
+          PACKAGE_VERSION: ${{ inputs.package-version }}
+          SIGN: ${{ inputs.sign }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$DESTINATION"
+          args=("$CHART" --destination "$DESTINATION")
+          if [[ -n "$PACKAGE_VERSION" ]]; then
+            args+=(--version "$PACKAGE_VERSION")
+          fi
+          if [[ -n "$APP_VERSION" ]]; then
+            args+=(--app-version "$APP_VERSION")
+          fi
+          if [[ "$SIGN" == "true" ]]; then
+            args+=(--sign --key "$GPG_KEY_NAME")
+          fi
+          helm package "${args[@]}"
+          package_file="$(find "$DESTINATION" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
+          if [[ -z "$package_file" ]]; then
+            echo "::error::Unable to find packaged chart in $DESTINATION"
+            exit 1
+          fi
+          echo "package-file=$package_file" >> "$GITHUB_OUTPUT"
+      - name: Release to ChartMuseum
+        if: ${{ inputs.release && inputs.release-target == 'chartmuseum' }}
+        env:
+          CHARTMUSEUM_URL: ${{ inputs.chartmuseum-url }}
           HELM_REPO_USERNAME: ${{ secrets.helm-repo-username }}
           HELM_REPO_PASSWORD: ${{ secrets.helm-repo-password }}
+          PACKAGE_FILE: ${{ steps.package.outputs.package-file }}
+          SIGN: ${{ inputs.sign }}
         run: |
-          FILE_PATH=$(helm package --sign --key 'Boban Acimovic' "$CHART" | awk '{print $8}')
-          FILE=$(basename "${FILE_PATH}")
-          echo "Uploading ${FILE} chart and provenance ${FILE}.prov"
-          curl -u "${HELM_REPO_USERNAME}:${HELM_REPO_PASSWORD}" \
-            -F "chart=@${FILE}" \
-            -F "prov=@${FILE}.prov" \
-            https://charts.ectobit.com/api/charts
+          set -euo pipefail
+          file="$(basename "$PACKAGE_FILE")"
+          args=(-u "${HELM_REPO_USERNAME}:${HELM_REPO_PASSWORD}" -F "chart=@${PACKAGE_FILE}")
+          if [[ "$SIGN" == "true" ]]; then
+            args+=(-F "prov=@${PACKAGE_FILE}.prov")
+          fi
+          echo "Uploading ${file} chart"
+          curl "${args[@]}" "$CHARTMUSEUM_URL"
+      - name: Log in to OCI registry
+        if: ${{ inputs.release && inputs.release-target == 'oci' }}
+        env:
+          HELM_REPO_USERNAME: ${{ secrets.helm-repo-username }}
+          HELM_REPO_PASSWORD: ${{ secrets.helm-repo-password }}
+          REGISTRY: ${{ inputs.registry }}
+        run: echo "$HELM_REPO_PASSWORD" | helm registry login "$REGISTRY" --username "$HELM_REPO_USERNAME" --password-stdin
+      - name: Release to OCI registry
+        if: ${{ inputs.release && inputs.release-target == 'oci' }}
+        env:
+          OCI_REPOSITORY: ${{ inputs.oci-repository }}
+          PACKAGE_FILE: ${{ steps.package.outputs.package-file }}
+        run: helm push "$PACKAGE_FILE" "$OCI_REPOSITORY"

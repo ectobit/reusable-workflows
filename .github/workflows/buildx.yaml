@@ -65,6 +65,26 @@ on:
         required: false
         default: ''
         description: container image build arguments
+      grype:
+        type: boolean
+        required: false
+        default: false
+        description: whether to scan the built image with Grype before pushing
+      grype-fail-build:
+        type: boolean
+        required: false
+        default: true
+        description: whether Grype findings should fail the build
+      grype-severity-cutoff:
+        type: string
+        required: false
+        default: high
+        description: minimum Grype severity that fails the build when grype-fail-build is true
+      grype-sarif-artifact-name:
+        type: string
+        required: false
+        default: grype-sarif
+        description: uploaded SARIF artifact name for Grype scan results
     secrets:
       container-registry-username:
         required: true
@@ -123,22 +143,27 @@ jobs:
       - name: Output short tag
         id: tags
         run: echo "sha-tag=sha-$(echo ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }} | cut -c1-7)" >> "${GITHUB_OUTPUT}"
+      - name: Check Grype scan mode supports the selected platforms
+        if: ${{ inputs.grype && contains(inputs.platforms, ',') }}
+        run: |
+          echo "::error::Grype scan mode builds with load=true and only supports one platform at a time; received '${{ inputs.platforms }}'."
+          exit 1
       - name: Login to Docker Hub container registry
         uses: docker/login-action@v4.4.0
-        if: ${{ inputs.registry == ''}}
+        if: ${{ inputs.push && inputs.registry == ''}}
         with:
           username: ${{ secrets.container-registry-username }}
           password: ${{ secrets.container-registry-password }}
       - name: Login to ${{ inputs.registry }} container registry
         uses: docker/login-action@v4.4.0
-        if: ${{ inputs.registry != ''}}
+        if: ${{ inputs.push && inputs.registry != ''}}
         with:
           registry: ${{ inputs.registry }}
           username: ${{ secrets.container-registry-username }}
           password: ${{ secrets.container-registry-password }}
       - name: Build and push image to container registry using registry cache
         uses: docker/build-push-action@v7.3.0
-        if: ${{ inputs.cache-type == 'registry' && inputs.build-args == '' }}
+        if: ${{ inputs.grype != true && inputs.cache-type == 'registry' && inputs.build-args == '' }}
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
@@ -150,7 +175,7 @@ jobs:
           cache-to: ${{ inputs.push && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || 'type=gha,mode=max' }}
       - name: Build and push image with build args ${{ inputs.build-args }} to container registry using registry cache
         uses: docker/build-push-action@v7.3.0
-        if: ${{ inputs.cache-type == 'registry' && inputs.build-args != '' }}
+        if: ${{ inputs.grype != true && inputs.cache-type == 'registry' && inputs.build-args != '' }}
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
@@ -163,7 +188,7 @@ jobs:
           cache-to: ${{ inputs.push && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || 'type=gha,mode=max' }}
       - name: Build and push image to container registry using gha cache
         uses: docker/build-push-action@v7.3.0
-        if: ${{ inputs.cache-type == 'gha' && inputs.build-args == '' }}
+        if: ${{ inputs.grype != true && inputs.cache-type == 'gha' && inputs.build-args == '' }}
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
@@ -175,7 +200,7 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Build and push image with build args ${{ inputs.build-args }} to container registry using gha cache
         uses: docker/build-push-action@v7.3.0
-        if: ${{ inputs.cache-type == 'gha' && inputs.build-args != '' }}
+        if: ${{ inputs.grype != true && inputs.cache-type == 'gha' && inputs.build-args != '' }}
         with:
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
@@ -186,3 +211,82 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Build image locally for Grype scan using registry cache
+        uses: docker/build-push-action@v7.3.0
+        if: ${{ inputs.grype && inputs.cache-type == 'registry' && inputs.build-args == '' }}
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ inputs.image }}:buildcache
+          cache-to: ${{ inputs.push && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || 'type=gha,mode=max' }}
+      - name: Build image with build args ${{ inputs.build-args }} locally for Grype scan using registry cache
+        uses: docker/build-push-action@v7.3.0
+        if: ${{ inputs.grype && inputs.cache-type == 'registry' && inputs.build-args != '' }}
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          build-args: ${{ inputs.build-args }}
+          platforms: ${{ inputs.platforms }}
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ inputs.image }}:buildcache
+          cache-to: ${{ inputs.push && format('type=registry,ref={0}:buildcache,mode=max', inputs.image) || 'type=gha,mode=max' }}
+      - name: Build image locally for Grype scan using gha cache
+        uses: docker/build-push-action@v7.3.0
+        if: ${{ inputs.grype && inputs.cache-type == 'gha' && inputs.build-args == '' }}
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          platforms: ${{ inputs.platforms }}
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Build image with build args ${{ inputs.build-args }} locally for Grype scan using gha cache
+        uses: docker/build-push-action@v7.3.0
+        if: ${{ inputs.grype && inputs.cache-type == 'gha' && inputs.build-args != '' }}
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          build-args: ${{ inputs.build-args }}
+          platforms: ${{ inputs.platforms }}
+          load: true
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Scan image with Grype
+        id: grype
+        if: ${{ inputs.grype }}
+        uses: anchore/scan-action@v7
+        with:
+          image: ${{ inputs.image }}:${{ steps.tags.outputs.sha-tag }}
+          fail-build: ${{ inputs.grype-fail-build }}
+          severity-cutoff: ${{ inputs.grype-severity-cutoff }}
+      - name: Upload Grype SARIF artifact
+        if: ${{ inputs.grype && always() && steps.grype.outputs.sarif != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.grype-sarif-artifact-name }}
+          path: ${{ steps.grype.outputs.sarif }}
+      - name: Push scanned image tags
+        if: ${{ inputs.grype && inputs.push }}
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            if [[ -n "$tag" ]]; then
+              docker push "$tag"
+            fi
+          done <<< "$IMAGE_TAGS"
