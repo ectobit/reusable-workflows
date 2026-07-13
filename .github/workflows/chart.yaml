@@ -1,6 +1,11 @@
 on:
   workflow_call:
     inputs:
+      runner:
+        type: string
+        required: false
+        default: '"ubuntu-latest"'
+        description: JSON runner label or label array passed to runs-on
       chart:
         type: string
         required: true
@@ -88,7 +93,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runner) }}
     steps:
       - name: Set up Helm
         uses: azure/setup-helm@v5.0.1

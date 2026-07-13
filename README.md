@@ -7,6 +7,18 @@ Reusable GitHub Actions Workflows
 
 Please check the [.github/workflows](.github/workflows) directory
 
+## Runner selection
+
+The `buildx.yaml`, `go-check.yaml`, and `chart.yaml` workflows accept an
+optional `runner` input containing a JSON runner label or label array. It
+defaults to `"ubuntu-latest"`, preserving existing callers. A trusted caller
+can target the Emaia laptop runner with:
+
+```yaml
+with:
+  runner: '["self-hosted","linux","emaia"]'
+```
+
 ## Caller-controlled execution
 
 Reusable workflows in this repository do not decide which branches, tags, or events should deploy or publish artifacts. Caller workflows should express that policy with their own `on` and `if` conditions.
