@@ -38,7 +38,7 @@ jobs:
 
     steps:
       - name: Set up go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ inputs.go-version }}
       - name: Check out
