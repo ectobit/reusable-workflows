@@ -64,6 +64,12 @@ run_diff() {
   output="$7"
   summary="$8"
 
+  if [ -n "$event_base_sha" ]; then
+    event_name=pull_request
+  else
+    event_name=workflow_dispatch
+  fi
+
   (
     cd "$repo"
     INPUT_BASE_REF="$base_ref" \
@@ -71,6 +77,7 @@ run_diff() {
       INPUT_GO_MOD_FILE="$go_mod_file" \
       EVENT_BASE_SHA="$event_base_sha" \
       EVENT_HEAD_SHA="$event_head_sha" \
+      EVENT_NAME="$event_name" \
       GITHUB_SHA="$(git rev-parse HEAD)" \
       GITHUB_OUTPUT="$output" \
       GITHUB_STEP_SUMMARY="$summary" \
@@ -110,6 +117,37 @@ test_pull_request_uses_merge_base() {
   output="$tmp_root/merge-base.output"
   summary="$tmp_root/merge-base.summary"
   run_diff "$repo" '' '' "$main_sha" "$feature_sha" go.mod "$output" "$summary"
+  assert_output_value "$output" has_changes false
+
+  report="$(sed -n 's/^report_json=//p' "$output")"
+  merge_base="$(git -C "$repo" merge-base "$main_sha" "$feature_sha")"
+  actual="$(printf '%s' "$report" | jq -r '[.base_is_merge_base, .base_ref_commit, .base_commit] | join(",")')"
+  expected="true,$main_sha,$merge_base"
+  [ "$actual" = "$expected" ] || {
+    echo "Expected merge-base metadata $expected, got $actual" >&2
+    exit 1
+  }
+}
+
+test_explicit_pull_request_base_uses_merge_base() {
+  repo="$(new_repo explicit-merge-base)"
+  write_go_mod "$repo/go.mod" example.com/app v1.0.0 yes
+  commit_all "$repo" base
+
+  git -C "$repo" switch -q -c feature
+  echo feature >"$repo/feature.txt"
+  commit_all "$repo" feature
+  feature_sha="$(git -C "$repo" rev-parse HEAD)"
+
+  git -C "$repo" switch -q main
+  write_go_mod "$repo/go.mod" example.com/app v1.1.0 yes
+  commit_all "$repo" main-update
+  main_sha="$(git -C "$repo" rev-parse HEAD)"
+  git -C "$repo" switch -q feature
+
+  output="$tmp_root/explicit-merge-base.output"
+  summary="$tmp_root/explicit-merge-base.summary"
+  run_diff "$repo" "$main_sha" '' "$main_sha" "$feature_sha" go.mod "$output" "$summary"
   assert_output_value "$output" has_changes false
 }
 
@@ -245,6 +283,7 @@ test_missing_jq_fails_clearly() {
 run_test() {
   case "$1" in
     merge-base) test_pull_request_uses_merge_base ;;
+    explicit-merge-base) test_explicit_pull_request_base_uses_merge_base ;;
     missing-base) test_missing_base_is_empty ;;
     missing-head) test_missing_head_is_empty ;;
     both-missing) test_both_missing_fails_clearly ;;
@@ -259,7 +298,7 @@ run_test() {
 }
 
 if [ "$test_case" = all ]; then
-  for name in merge-base missing-base missing-head both-missing directory-path remote-branch missing-jq; do
+  for name in merge-base explicit-merge-base missing-base missing-head both-missing directory-path remote-branch missing-jq; do
     run_test "$name"
   done
 else

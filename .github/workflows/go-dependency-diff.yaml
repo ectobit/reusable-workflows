@@ -27,7 +27,7 @@ on:
         type: string
         required: false
         default: ''
-        description: Base Git ref or SHA; defaults to the pull request base SHA
+        description: Base ref or SHA; defaults to the PR base SHA and is a merge-base candidate on PRs
       head-ref:
         type: string
         required: false
@@ -75,6 +75,7 @@ jobs:
         env:
           EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_NAME: ${{ github.event_name }}
           INPUT_BASE_REF: ${{ inputs.base-ref }}
           INPUT_GO_MOD_FILE: ${{ inputs.go-mod-file }}
           INPUT_HEAD_REF: ${{ inputs.head-ref }}
@@ -89,15 +90,14 @@ jobs:
             fi
           done
 
-          merge_pr_base=false
-          if [[ -n "$INPUT_BASE_REF" ]]; then
-            base_ref="$INPUT_BASE_REF"
-          else
-            base_ref="$EVENT_BASE_SHA"
-            merge_pr_base=true
-          fi
+          base_ref="${INPUT_BASE_REF:-$EVENT_BASE_SHA}"
           head_ref="${INPUT_HEAD_REF:-${EVENT_HEAD_SHA:-$GITHUB_SHA}}"
           go_mod_file="$INPUT_GO_MOD_FILE"
+          base_is_merge_base=false
+
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            base_is_merge_base=true
+          fi
 
           if [[ -z "$base_ref" ]]; then
             echo "Base ref is required outside a pull request." >&2
@@ -143,10 +143,11 @@ jobs:
             printf '%s\n' "$commit"
           }
 
-          base_commit="$(resolve_commit Base "$base_ref")"
+          base_ref_commit="$(resolve_commit Base "$base_ref")"
+          base_commit="$base_ref_commit"
           head_commit="$(resolve_commit Head "$head_ref")"
 
-          if [[ "$merge_pr_base" == true ]]; then
+          if [[ "$base_is_merge_base" == true ]]; then
             if ! base_commit="$(git merge-base "$base_commit" "$head_commit")"; then
               echo "Base and head refs do not have a merge base." >&2
               exit 1
@@ -194,7 +195,9 @@ jobs:
 
           jq -n \
             --arg base_ref "$base_ref" \
+            --arg base_ref_commit "$base_ref_commit" \
             --arg base_commit "$base_commit" \
+            --argjson base_is_merge_base "$base_is_merge_base" \
             --arg head_ref "$head_ref" \
             --arg head_commit "$head_commit" \
             --arg go_mod_file "$go_mod_file" \
@@ -204,7 +207,9 @@ jobs:
               ($head[0] | map({key: .Path, value: .Version}) | from_entries) as $head_modules |
               {
                 base_ref: $base_ref,
+                base_ref_commit: $base_ref_commit,
                 base_commit: $base_commit,
+                base_is_merge_base: $base_is_merge_base,
                 head_ref: $head_ref,
                 head_commit: $head_commit,
                 go_mod_file: $go_mod_file,
@@ -254,7 +259,14 @@ jobs:
             "## Direct Go dependency diff",
             "",
             "**Module file:** `\(.go_mod_file)`  ",
-            "**Base:** `\(.base_ref)` (`\(.base_commit)`)  ",
+            (
+              if .base_is_merge_base then
+                "**Base candidate:** `\(.base_ref)` (`\(.base_ref_commit)`)  ",
+                "**Comparison base (merge base):** `\(.base_commit)`  "
+              else
+                "**Base:** `\(.base_ref)` (`\(.base_commit)`)  "
+              end
+            ),
             "**Head:** `\(.head_ref)` (`\(.head_commit)`)",
             "",
             "| Result | Count |",

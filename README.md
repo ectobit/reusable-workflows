@@ -144,7 +144,10 @@ requirements, `go.sum`, `replace` or `tool` directives, the Go version, or
 compiled binary size.
 
 On pull requests, the workflow compares the head commit with its merge base
-against the pull request base. Callers for other events must pass `base-ref`;
+against the selected base, including when `base-ref` is explicitly supplied.
+The JSON report exposes the selected ref's resolved commit as
+`base_ref_commit`, the actual comparison commit as `base_commit`, and sets
+`base_is_merge_base` to `true`. Callers for other events must pass `base-ref`;
 plain branch names fall back to their `origin/` remote-tracking branch. Callers
 can optionally override `head-ref`, which otherwise defaults to `GITHUB_SHA`.
 If the module file exists at only one commit, the missing side is treated as an
