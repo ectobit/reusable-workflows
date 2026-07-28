@@ -135,6 +135,36 @@ jobs:
       go-fix-check: false
 ```
 
+## Compare direct Go dependencies
+
+`go-dependency-diff.yaml` compares direct requirements in a Go module file
+between two Git commits. It writes a readable job summary and exposes the
+`has_changes` and `report_json` workflow outputs. It does not compare indirect
+requirements, `go.sum`, `replace` or `tool` directives, the Go version, or
+compiled binary size.
+
+On pull requests, the base and head refs default to the pull request commits.
+Callers for other events must pass `base-ref`; they can optionally override
+`head-ref`, which otherwise defaults to `GITHUB_SHA`.
+
+For example, a repository such as Emaia with its Go module under `backend/`
+can call it with:
+
+```yaml
+jobs:
+  dependency-diff:
+    uses: ectobit/reusable-workflows/.github/workflows/go-dependency-diff.yaml@main
+    with:
+      runner: '["self-hosted","linux","emaia"]'
+      go-version: 1.26.5
+      go-toolchain: local
+      go-mod-file: backend/go.mod
+      fail-on-changes: false
+```
+
+Set `fail-on-changes: true` only when any direct dependency change should be a
+blocking policy violation. The default is report-only.
+
 ## Check and release Helm charts
 
 `chart.yaml` can run Helm lint, a default `helm template`, caller-supplied render/check commands, and optional chart publishing. Existing ChartMuseum callers continue to work. OCI publishing is available with `release-target: oci`.
