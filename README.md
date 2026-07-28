@@ -143,9 +143,16 @@ between two Git commits. It writes a readable job summary and exposes the
 requirements, `go.sum`, `replace` or `tool` directives, the Go version, or
 compiled binary size.
 
-On pull requests, the base and head refs default to the pull request commits.
-Callers for other events must pass `base-ref`; they can optionally override
-`head-ref`, which otherwise defaults to `GITHUB_SHA`.
+On pull requests, the workflow compares the head commit with its merge base
+against the pull request base. Callers for other events must pass `base-ref`;
+plain branch names fall back to their `origin/` remote-tracking branch. Callers
+can optionally override `head-ref`, which otherwise defaults to `GITHUB_SHA`.
+If the module file exists at only one commit, the missing side is treated as an
+empty dependency set so module creation and deletion remain reportable changes.
+
+The runner must provide `git` and `jq`; the selected Go version is installed by
+`actions/setup-go`. The workflow checks these commands up front and reports a
+clear error when a prerequisite is unavailable on a self-hosted runner.
 
 For example, a repository such as Emaia with its Go module under `backend/`
 can call it with:

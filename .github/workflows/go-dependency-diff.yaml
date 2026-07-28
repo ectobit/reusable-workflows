@@ -82,7 +82,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          base_ref="${INPUT_BASE_REF:-$EVENT_BASE_SHA}"
+          for command in git go jq; do
+            if ! command -v "$command" >/dev/null 2>&1; then
+              echo "Missing required command: $command" >&2
+              exit 1
+            fi
+          done
+
+          merge_pr_base=false
+          if [[ -n "$INPUT_BASE_REF" ]]; then
+            base_ref="$INPUT_BASE_REF"
+          else
+            base_ref="$EVENT_BASE_SHA"
+            merge_pr_base=true
+          fi
           head_ref="${INPUT_HEAD_REF:-${EVENT_HEAD_SHA:-$GITHUB_SHA}}"
           go_mod_file="$INPUT_GO_MOD_FILE"
 
@@ -116,8 +129,10 @@ jobs:
             local commit
 
             if ! commit="$(git rev-parse --verify --end-of-options "${ref}^{commit}" 2>/dev/null)"; then
-              echo "$label ref is unavailable: $ref" >&2
-              return 1
+              if ! commit="$(git rev-parse --verify --end-of-options "origin/${ref}^{commit}" 2>/dev/null)"; then
+                echo "$label ref is unavailable: $ref" >&2
+                return 1
+              fi
             fi
 
             if [[ ! "$commit" =~ ^[0-9a-f]+$ ]]; then
@@ -131,26 +146,51 @@ jobs:
           base_commit="$(resolve_commit Base "$base_ref")"
           head_commit="$(resolve_commit Head "$head_ref")"
 
-          for revision in "$base_commit" "$head_commit"; do
-            if ! git cat-file -e "${revision}:${go_mod_file}" 2>/dev/null; then
-              echo "$go_mod_file does not exist at commit $revision" >&2
+          if [[ "$merge_pr_base" == true ]]; then
+            if ! base_commit="$(git merge-base "$base_commit" "$head_commit")"; then
+              echo "Base and head refs do not have a merge base." >&2
               exit 1
             fi
-          done
+          fi
+
+          base_type="$(git cat-file -t "${base_commit}:${go_mod_file}" 2>/dev/null || true)"
+          head_type="$(git cat-file -t "${head_commit}:${go_mod_file}" 2>/dev/null || true)"
+
+          if [[ -z "$base_type" && -z "$head_type" ]]; then
+            echo "$go_mod_file does not exist at either commit." >&2
+            exit 1
+          fi
+
+          if [[ -n "$base_type" && "$base_type" != blob ]]; then
+            echo "$go_mod_file is not a file at commit $base_commit" >&2
+            exit 1
+          fi
+
+          if [[ -n "$head_type" && "$head_type" != blob ]]; then
+            echo "$go_mod_file is not a file at commit $head_commit" >&2
+            exit 1
+          fi
 
           tmp_dir="$(mktemp -d)"
           trap 'rm -rf "$tmp_dir"' EXIT
 
-          git show "${base_commit}:${go_mod_file}" >"$tmp_dir/base.mod"
-          git show "${head_commit}:${go_mod_file}" >"$tmp_dir/head.mod"
-
           # Direct requirements omit Indirect from `go mod edit -json`, so
           # `.Indirect != true` intentionally includes only direct modules.
-          go mod edit -json "$tmp_dir/base.mod" |
-            jq '[.Require[]? | select(.Indirect != true)]' >"$tmp_dir/base.json"
+          if [[ "$base_type" == blob ]]; then
+            git show "${base_commit}:${go_mod_file}" >"$tmp_dir/base.mod"
+            go mod edit -json "$tmp_dir/base.mod" |
+              jq '[.Require[]? | select(.Indirect != true)]' >"$tmp_dir/base.json"
+          else
+            echo '[]' >"$tmp_dir/base.json"
+          fi
 
-          go mod edit -json "$tmp_dir/head.mod" |
-            jq '[.Require[]? | select(.Indirect != true)]' >"$tmp_dir/head.json"
+          if [[ "$head_type" == blob ]]; then
+            git show "${head_commit}:${go_mod_file}" >"$tmp_dir/head.mod"
+            go mod edit -json "$tmp_dir/head.mod" |
+              jq '[.Require[]? | select(.Indirect != true)]' >"$tmp_dir/head.json"
+          else
+            echo '[]' >"$tmp_dir/head.json"
+          fi
 
           jq -n \
             --arg base_ref "$base_ref" \
