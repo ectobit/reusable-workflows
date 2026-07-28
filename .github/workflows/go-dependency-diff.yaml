@@ -77,6 +77,7 @@ jobs:
           EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           EVENT_NAME: ${{ github.event_name }}
           INPUT_BASE_REF: ${{ inputs.base-ref }}
+          INPUT_FAIL_ON_CHANGES: ${{ inputs.fail-on-changes }}
           INPUT_GO_MOD_FILE: ${{ inputs.go-mod-file }}
           INPUT_HEAD_REF: ${{ inputs.head-ref }}
           GOTOOLCHAIN: ${{ inputs.go-toolchain }}
@@ -287,9 +288,7 @@ jobs:
             (if (.updated | length) == 0 then "_None_" else (.updated[] | "- `\(.module)` `\(.from)` → `\(.to)`") end)
           ' "$tmp_dir/report.json" >>"$GITHUB_STEP_SUMMARY"
 
-      - name: Reject dependency changes
-        if: ${{ inputs.fail-on-changes && steps.diff.outputs.has_changes == 'true' }}
-        shell: sh
-        run: |
-          echo "Direct Go dependency changes were detected." >&2
-          exit 1
+          if [[ "$INPUT_FAIL_ON_CHANGES" == true && "$has_changes" == true ]]; then
+            echo "Direct Go dependency changes were detected." >&2
+            exit 1
+          fi
