@@ -135,6 +135,46 @@ jobs:
       go-fix-check: false
 ```
 
+## Compare direct Go dependencies
+
+`go-dependency-diff.yaml` compares direct requirements in a Go module file
+between two Git commits. It writes a readable job summary and exposes the
+`has_changes` and `report_json` workflow outputs. It does not compare indirect
+requirements, `go.sum`, `replace` or `tool` directives, the Go version, or
+compiled binary size.
+
+On pull requests, the workflow compares the head commit with its merge base
+against the selected base, including when `base-ref` is explicitly supplied.
+The JSON report exposes the selected ref's resolved commit as
+`base_ref_commit`, the actual comparison commit as `base_commit`, and sets
+`base_is_merge_base` to `true`. Callers for other events must pass `base-ref`;
+plain branch names fall back to their `origin/` remote-tracking branch. Callers
+can optionally override `head-ref`, which otherwise defaults to `GITHUB_SHA`.
+If the module file exists at only one commit, the missing side is treated as an
+empty dependency set so module creation and deletion remain reportable changes.
+
+The runner must provide `git` and `jq`; the selected Go version is installed by
+`actions/setup-go`. The workflow checks these commands up front and reports a
+clear error when a prerequisite is unavailable on a self-hosted runner.
+
+For example, a repository such as Emaia with its Go module under `backend/`
+can call it with:
+
+```yaml
+jobs:
+  dependency-diff:
+    uses: ectobit/reusable-workflows/.github/workflows/go-dependency-diff.yaml@main
+    with:
+      runner: '["self-hosted","linux","emaia"]'
+      go-version: 1.26.5
+      go-toolchain: local
+      go-mod-file: backend/go.mod
+      fail-on-changes: false
+```
+
+Set `fail-on-changes: true` only when any direct dependency change should be a
+blocking policy violation. The default is report-only.
+
 ## Check and release Helm charts
 
 `chart.yaml` can run Helm lint, a default `helm template`, caller-supplied render/check commands, and optional chart publishing. Existing ChartMuseum callers continue to work. OCI publishing is available with `release-target: oci`.

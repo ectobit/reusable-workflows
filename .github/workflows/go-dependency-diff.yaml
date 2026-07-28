@@ -1,0 +1,294 @@
+name: Go dependency diff
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: false
+        default: '"ubuntu-latest"'
+        description: JSON runner label or label array passed to runs-on
+      go-version:
+        type: string
+        required: false
+        default: 1.26.5
+        description: Go version used to parse the module files
+      go-toolchain:
+        type: string
+        required: false
+        default: auto
+        description: GOTOOLCHAIN environment variable for Go commands
+      go-mod-file:
+        type: string
+        required: false
+        default: go.mod
+        description: Repository-relative path to the Go module file
+      base-ref:
+        type: string
+        required: false
+        default: ''
+        description: Base ref or SHA; defaults to the PR base SHA and is a merge-base candidate on PRs
+      head-ref:
+        type: string
+        required: false
+        default: ''
+        description: Head Git ref or SHA; defaults to the pull request head SHA or GITHUB_SHA
+      fail-on-changes:
+        type: boolean
+        required: false
+        default: false
+        description: Fail when direct Go dependencies changed
+    outputs:
+      has_changes:
+        description: Whether direct Go dependencies changed
+        value: ${{ jobs.dependency-diff.outputs.has_changes }}
+      report_json:
+        description: Direct Go dependency differences as compact JSON
+        value: ${{ jobs.dependency-diff.outputs.report_json }}
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-diff:
+    name: Compare direct Go dependencies
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    timeout-minutes: 5
+    outputs:
+      has_changes: ${{ steps.diff.outputs.has_changes }}
+      report_json: ${{ steps.diff.outputs.report_json }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ inputs.go-version }}
+          cache: false
+
+      - name: Compare direct dependencies
+        id: diff
+        shell: bash
+        env:
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_BASE_REF: ${{ inputs.base-ref }}
+          INPUT_FAIL_ON_CHANGES: ${{ inputs.fail-on-changes }}
+          INPUT_GO_MOD_FILE: ${{ inputs.go-mod-file }}
+          INPUT_HEAD_REF: ${{ inputs.head-ref }}
+          GOTOOLCHAIN: ${{ inputs.go-toolchain }}
+        run: |
+          set -euo pipefail
+
+          for command in git go jq; do
+            if ! command -v "$command" >/dev/null 2>&1; then
+              echo "Missing required command: $command" >&2
+              exit 1
+            fi
+          done
+
+          base_ref="${INPUT_BASE_REF:-$EVENT_BASE_SHA}"
+          head_ref="${INPUT_HEAD_REF:-${EVENT_HEAD_SHA:-$GITHUB_SHA}}"
+          go_mod_file="$INPUT_GO_MOD_FILE"
+          base_is_merge_base=false
+
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            base_is_merge_base=true
+          fi
+
+          if [[ -z "$base_ref" ]]; then
+            echo "Base ref is required outside a pull request." >&2
+            exit 1
+          fi
+
+          if [[ ! "$go_mod_file" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+            echo "Go module path contains unsupported characters: $go_mod_file" >&2
+            exit 1
+          fi
+
+          case "/$go_mod_file/" in
+            *"/./"*|*"/../"*)
+              echo "Go module path must not contain dot segments: $go_mod_file" >&2
+              exit 1
+              ;;
+          esac
+
+          case "$go_mod_file" in
+            /*|*/|*//* )
+              echo "Go module path must be a normalized repository-relative file: $go_mod_file" >&2
+              exit 1
+              ;;
+          esac
+
+          resolve_commit() {
+            local label="$1"
+            local ref="$2"
+            local commit
+
+            if ! commit="$(git rev-parse --verify --end-of-options "${ref}^{commit}" 2>/dev/null)"; then
+              if ! commit="$(git rev-parse --verify --end-of-options "origin/${ref}^{commit}" 2>/dev/null)"; then
+                echo "$label ref is unavailable: $ref" >&2
+                return 1
+              fi
+            fi
+
+            if [[ ! "$commit" =~ ^[0-9a-f]+$ ]]; then
+              echo "$label ref did not resolve to a commit: $ref" >&2
+              return 1
+            fi
+
+            printf '%s\n' "$commit"
+          }
+
+          base_ref_commit="$(resolve_commit Base "$base_ref")"
+          base_commit="$base_ref_commit"
+          head_commit="$(resolve_commit Head "$head_ref")"
+
+          if [[ "$base_is_merge_base" == true ]]; then
+            if ! base_commit="$(git merge-base "$base_commit" "$head_commit")"; then
+              echo "Base and head refs do not have a merge base." >&2
+              exit 1
+            fi
+          fi
+
+          base_type="$(git cat-file -t "${base_commit}:${go_mod_file}" 2>/dev/null || true)"
+          head_type="$(git cat-file -t "${head_commit}:${go_mod_file}" 2>/dev/null || true)"
+
+          if [[ -z "$base_type" && -z "$head_type" ]]; then
+            echo "$go_mod_file does not exist at either commit." >&2
+            exit 1
+          fi
+
+          if [[ -n "$base_type" && "$base_type" != blob ]]; then
+            echo "$go_mod_file is not a file at commit $base_commit" >&2
+            exit 1
+          fi
+
+          if [[ -n "$head_type" && "$head_type" != blob ]]; then
+            echo "$go_mod_file is not a file at commit $head_commit" >&2
+            exit 1
+          fi
+
+          tmp_dir="$(mktemp -d)"
+          trap 'rm -rf "$tmp_dir"' EXIT
+
+          # Direct requirements omit Indirect from `go mod edit -json`, so
+          # `.Indirect != true` intentionally includes only direct modules.
+          if [[ "$base_type" == blob ]]; then
+            git show "${base_commit}:${go_mod_file}" >"$tmp_dir/base.mod"
+            go mod edit -json "$tmp_dir/base.mod" |
+              jq '[.Require[]? | select(.Indirect != true)]' >"$tmp_dir/base.json"
+          else
+            echo '[]' >"$tmp_dir/base.json"
+          fi
+
+          if [[ "$head_type" == blob ]]; then
+            git show "${head_commit}:${go_mod_file}" >"$tmp_dir/head.mod"
+            go mod edit -json "$tmp_dir/head.mod" |
+              jq '[.Require[]? | select(.Indirect != true)]' >"$tmp_dir/head.json"
+          else
+            echo '[]' >"$tmp_dir/head.json"
+          fi
+
+          jq -n \
+            --arg base_ref "$base_ref" \
+            --arg base_ref_commit "$base_ref_commit" \
+            --arg base_commit "$base_commit" \
+            --argjson base_is_merge_base "$base_is_merge_base" \
+            --arg head_ref "$head_ref" \
+            --arg head_commit "$head_commit" \
+            --arg go_mod_file "$go_mod_file" \
+            --slurpfile base "$tmp_dir/base.json" \
+            --slurpfile head "$tmp_dir/head.json" '
+              ($base[0] | map({key: .Path, value: .Version}) | from_entries) as $base_modules |
+              ($head[0] | map({key: .Path, value: .Version}) | from_entries) as $head_modules |
+              {
+                base_ref: $base_ref,
+                base_ref_commit: $base_ref_commit,
+                base_commit: $base_commit,
+                base_is_merge_base: $base_is_merge_base,
+                head_ref: $head_ref,
+                head_commit: $head_commit,
+                go_mod_file: $go_mod_file,
+                counts: {
+                  base_direct: ($base_modules | length),
+                  head_direct: ($head_modules | length),
+                  added: ([
+                    $head_modules | to_entries[] |
+                    select($base_modules[.key] == null)
+                  ] | length),
+                  removed: ([
+                    $base_modules | to_entries[] |
+                    select($head_modules[.key] == null)
+                  ] | length),
+                  updated: ([
+                    $head_modules | to_entries[] |
+                    select($base_modules[.key] != null and $base_modules[.key] != .value)
+                  ] | length)
+                },
+                added: [
+                  $head_modules | to_entries[] |
+                  select($base_modules[.key] == null) |
+                  {module: .key, version: .value}
+                ],
+                removed: [
+                  $base_modules | to_entries[] |
+                  select($head_modules[.key] == null) |
+                  {module: .key, version: .value}
+                ],
+                updated: [
+                  $head_modules | to_entries[] |
+                  select($base_modules[.key] != null and $base_modules[.key] != .value) |
+                  {module: .key, from: $base_modules[.key], to: .value}
+                ]
+              }
+            ' >"$tmp_dir/report.json"
+
+          has_changes="$(
+            jq -r '(.counts.added + .counts.removed + .counts.updated) > 0' \
+              "$tmp_dir/report.json"
+          )"
+
+          echo "has_changes=$has_changes" >>"$GITHUB_OUTPUT"
+          echo "report_json=$(jq -c . "$tmp_dir/report.json")" >>"$GITHUB_OUTPUT"
+
+          jq -r '
+            "## Direct Go dependency diff",
+            "",
+            "**Module file:** `\(.go_mod_file)`  ",
+            (
+              if .base_is_merge_base then
+                "**Base candidate:** `\(.base_ref)` (`\(.base_ref_commit)`)  ",
+                "**Comparison base (merge base):** `\(.base_commit)`  "
+              else
+                "**Base:** `\(.base_ref)` (`\(.base_commit)`)  "
+              end
+            ),
+            "**Head:** `\(.head_ref)` (`\(.head_commit)`)",
+            "",
+            "| Result | Count |",
+            "| --- | ---: |",
+            "| Base direct dependencies | \(.counts.base_direct) |",
+            "| Head direct dependencies | \(.counts.head_direct) |",
+            "| Added | \(.counts.added) |",
+            "| Removed | \(.counts.removed) |",
+            "| Updated | \(.counts.updated) |",
+            "",
+            "### Added",
+            (if (.added | length) == 0 then "_None_" else (.added[] | "- `\(.module)` `\(.version)`") end),
+            "",
+            "### Removed",
+            (if (.removed | length) == 0 then "_None_" else (.removed[] | "- `\(.module)` `\(.version)`") end),
+            "",
+            "### Updated",
+            (if (.updated | length) == 0 then "_None_" else (.updated[] | "- `\(.module)` `\(.from)` → `\(.to)`") end)
+          ' "$tmp_dir/report.json" >>"$GITHUB_STEP_SUMMARY"
+
+          if [[ "$INPUT_FAIL_ON_CHANGES" == true && "$has_changes" == true ]]; then
+            echo "Direct Go dependency changes were detected." >&2
+            exit 1
+          fi
