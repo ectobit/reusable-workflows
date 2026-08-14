@@ -39,7 +39,7 @@ write_go_mod() {
   {
     echo "module $module"
     echo
-    echo "go 1.26.5"
+    echo "go 1.26.6"
     if [ -n "$dependency" ]; then
       echo
       echo "require example.com/dependency $version"

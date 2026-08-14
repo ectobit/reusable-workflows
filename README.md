@@ -29,7 +29,7 @@ For example, `buildx.yaml` pushes an image whenever it runs. To publish only fro
 on:
   push:
     branches:
-    - main
+      - main
   pull_request:
 
 jobs:
@@ -166,7 +166,7 @@ jobs:
     uses: ectobit/reusable-workflows/.github/workflows/go-dependency-diff.yaml@main
     with:
       runner: '["self-hosted","linux","emaia"]'
-      go-version: 1.26.5
+      go-version: 1.26.6
       go-toolchain: local
       go-mod-file: backend/go.mod
       fail-on-changes: false
@@ -248,56 +248,56 @@ The private Kubernetes API address is used as the SSH tunnel target, through `SS
   version: 2.0.2
   namespace: default
   values:
-  - resources:
-    - apiVersion: v1
-      kind: ServiceAccount
-      metadata:
-        name: deploy
-        namespace: default
-    - apiVersion: rbac.authorization.k8s.io/v1
-      kind: Role
-      metadata:
-        name: deploy
-        namespace: default
-      rules:
-      - apiGroups: ['apps']
-        resources: ['deployments']
-        verbs: ['get', 'list', 'patch', 'update']
-    - apiVersion: rbac.authorization.k8s.io/v1
-      kind: RoleBinding
-      metadata:
-        name: deploy
-        namespace: default
-      subjects:
-      - kind: ServiceAccount
-        name: deploy
-        namespace: default
-      roleRef:
-        kind: Role
-        name: deploy
-        apiGroup: rbac.authorization.k8s.io
-    - apiVersion: rbac.authorization.k8s.io/v1
-      kind: Role
-      metadata:
-        name: deploy
-        namespace: repo
-      rules:
-      - apiGroups: ['apps']
-        resources: ['deployments']
-        verbs: ['get', 'list', 'patch', 'update']
-    - apiVersion: rbac.authorization.k8s.io/v1
-      kind: RoleBinding
-      metadata:
-        name: deploy
-        namespace: repo
-      subjects:
-      - kind: ServiceAccount
-        name: deploy
-        namespace: default
-      roleRef:
-        kind: Role
-        name: deploy
-        apiGroup: rbac.authorization.k8s.io
+    - resources:
+        - apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: deploy
+            namespace: default
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: Role
+          metadata:
+            name: deploy
+            namespace: default
+          rules:
+            - apiGroups: ['apps']
+              resources: ['deployments']
+              verbs: ['get', 'list', 'patch', 'update']
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: deploy
+            namespace: default
+          subjects:
+            - kind: ServiceAccount
+              name: deploy
+              namespace: default
+          roleRef:
+            kind: Role
+            name: deploy
+            apiGroup: rbac.authorization.k8s.io
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: Role
+          metadata:
+            name: deploy
+            namespace: repo
+          rules:
+            - apiGroups: ['apps']
+              resources: ['deployments']
+              verbs: ['get', 'list', 'patch', 'update']
+        - apiVersion: rbac.authorization.k8s.io/v1
+          kind: RoleBinding
+          metadata:
+            name: deploy
+            namespace: repo
+          subjects:
+            - kind: ServiceAccount
+              name: deploy
+              namespace: default
+          roleRef:
+            kind: Role
+            name: deploy
+            apiGroup: rbac.authorization.k8s.io
 ```
 
 If your cluster does not create a ServiceAccount token Secret automatically, create one for the `deploy` ServiceAccount:
@@ -341,7 +341,7 @@ Store the resulting values as GitHub Actions secrets. Do not print tokens, kubec
 on:
   push:
     branches:
-    - main
+      - main
 
 jobs:
   deploy:
