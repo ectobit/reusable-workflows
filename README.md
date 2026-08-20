@@ -129,7 +129,7 @@ jobs:
       working-directory: backend
       lint-command: make lint
       extra-check-command: make openapi-check
-      govulncheck-version: latest
+      govulncheck-version: v1.7.0
       go-toolchain: local
       go-fix-check: false
 ```
