@@ -130,7 +130,6 @@ jobs:
       lint-command: make lint
       extra-check-command: make openapi-check
       govulncheck-version: latest
-      go-experiment: jsonv2
       go-toolchain: local
       go-fix-check: false
 ```
@@ -166,7 +165,7 @@ jobs:
     uses: ectobit/reusable-workflows/.github/workflows/go-dependency-diff.yaml@main
     with:
       runner: '["self-hosted","linux","emaia"]'
-      go-version: 1.26.7
+      go-version: 1.27.0
       go-toolchain: local
       go-mod-file: backend/go.mod
       fail-on-changes: false
