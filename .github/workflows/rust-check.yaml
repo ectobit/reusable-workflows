@@ -12,14 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ inputs.rust-version }}
       - name: Set up cargo cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         continue-on-error: false
         with:
           path: |

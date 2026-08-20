@@ -9,12 +9,12 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.26.6
+        default: 1.26.7
         description: go version to use for checks
       golangci-lint-version:
         type: string
         required: false
-        default: v2.12.2
+        default: v2.13.0
         description: golangci-lint version to use for lint checks
       govulncheck-version:
         type: string
@@ -70,14 +70,14 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runner) }}
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Set up go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@v7.0.0
         with:
           go-version: ${{ inputs.go-version }}
           cache: false
       - name: Set up go cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: |
             ~/.cache/go-build
@@ -92,7 +92,7 @@ jobs:
           mkdir -p "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Set up tools cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: ~/.local/bin
           key: ${{ runner.os }}-go-tools-${{ inputs.go-version }}-${{ inputs.golangci-lint-version }}-${{ inputs.govulncheck-version }}

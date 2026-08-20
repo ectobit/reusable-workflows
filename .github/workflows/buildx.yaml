@@ -109,7 +109,7 @@ jobs:
       sha-tag: ${{ steps.tags.outputs.sha-tag }}
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Lint Dockerfile with ignore
         if: ${{ inputs.hadolint && inputs.hadolint-ignore != ''}}
         uses: hadolint/hadolint-action@v3.4.0
@@ -124,12 +124,12 @@ jobs:
           dockerfile: ${{ inputs.dockerfile }}
           failure-threshold: ${{ inputs.hadolint-failure-threshold }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@v4.2.0
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4.2.0
+        uses: docker/setup-buildx-action@v4.3.0
       - name: Set up tags
         id: meta
-        uses: docker/metadata-action@v6
+        uses: docker/metadata-action@v6.2.0
         with:
           images: ${{ inputs.image }}
           labels: |
@@ -273,14 +273,14 @@ jobs:
       - name: Scan image with Grype
         id: grype
         if: ${{ inputs.grype }}
-        uses: anchore/scan-action@v7
+        uses: anchore/scan-action@v7.4.0
         with:
           image: ${{ inputs.image }}:${{ steps.tags.outputs.sha-tag }}
           fail-build: ${{ inputs.grype-fail-build }}
           severity-cutoff: ${{ inputs.grype-severity-cutoff }}
       - name: Upload Grype SARIF artifact
         if: ${{ inputs.grype && always() && steps.grype.outputs.sarif != '' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ${{ inputs.grype-sarif-artifact-name }}
           path: ${{ steps.grype.outputs.sarif }}

@@ -11,7 +11,7 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.26.6
+        default: 1.26.7
         description: Go version used to parse the module files
       go-toolchain:
         type: string
@@ -59,12 +59,12 @@ jobs:
       report_json: ${{ steps.diff.outputs.report_json }}
     steps:
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@v7.0.0
         with:
           go-version: ${{ inputs.go-version }}
           cache: false

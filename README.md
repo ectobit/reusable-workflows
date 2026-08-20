@@ -166,7 +166,7 @@ jobs:
     uses: ectobit/reusable-workflows/.github/workflows/go-dependency-diff.yaml@main
     with:
       runner: '["self-hosted","linux","emaia"]'
-      go-version: 1.26.6
+      go-version: 1.26.7
       go-toolchain: local
       go-mod-file: backend/go.mod
       fail-on-changes: false

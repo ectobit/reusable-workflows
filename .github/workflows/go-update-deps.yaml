@@ -4,7 +4,7 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.26.6
+        default: 1.26.7
         description: go version to use to update dependencies
       author:
         type: string
@@ -38,11 +38,11 @@ jobs:
 
     steps:
       - name: Set up go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@v7.0.0
         with:
           go-version: ${{ inputs.go-version }}
       - name: Check out
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
       - name: Update dependencies
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}
@@ -50,7 +50,7 @@ jobs:
           go get -t -u ./...
           go mod tidy
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@v8.1.1
         env:
           token: ${{ secrets.token }}
         if: ${{ env.token == '' }}
@@ -63,7 +63,7 @@ jobs:
           delete-branch: true
           assignees: ${{ inputs.assignees }}
       - name: Create pull request using token
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@v8.1.1
         env:
           token: ${{ secrets.token }}
         if: ${{ env.token != '' }}
