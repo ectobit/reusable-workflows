@@ -112,14 +112,14 @@ jobs:
         uses: actions/checkout@v7.0.1
       - name: Lint Dockerfile with ignore
         if: ${{ inputs.hadolint && inputs.hadolint-ignore != ''}}
-        uses: hadolint/hadolint-action@v3.4.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: ${{ inputs.dockerfile }}
           failure-threshold: ${{ inputs.hadolint-failure-threshold }}
           ignore: ${{ inputs.hadolint-ignore }}
       - name: Lint Dockerfile
         if: ${{ inputs.hadolint && inputs.hadolint-ignore == ''}}
-        uses: hadolint/hadolint-action@v3.4.0
+        uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: ${{ inputs.dockerfile }}
           failure-threshold: ${{ inputs.hadolint-failure-threshold }}
