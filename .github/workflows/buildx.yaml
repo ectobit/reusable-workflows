@@ -273,7 +273,7 @@ jobs:
       - name: Scan image with Grype
         id: grype
         if: ${{ inputs.grype }}
-        uses: anchore/scan-action@v7.4.0
+        uses: anchore/scan-action@v7.4.2
         with:
           image: ${{ inputs.image }}:${{ steps.tags.outputs.sha-tag }}
           fail-build: ${{ inputs.grype-fail-build }}
