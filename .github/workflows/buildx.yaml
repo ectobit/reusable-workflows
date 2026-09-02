@@ -85,6 +85,11 @@ on:
         required: false
         default: high
         description: minimum Grype severity that fails the build when grype-fail-build is true
+      grype-vex:
+        type: string
+        required: false
+        default: ''
+        description: newline-separated VEX documents passed explicitly to Grype
       grype-sarif-artifact-name:
         type: string
         required: false
@@ -124,7 +129,7 @@ jobs:
           dockerfile: ${{ inputs.dockerfile }}
           failure-threshold: ${{ inputs.hadolint-failure-threshold }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4.2.0
+        uses: docker/setup-qemu-action@v4.3.0
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.3.0
       - name: Set up tags
@@ -278,6 +283,7 @@ jobs:
           image: ${{ inputs.image }}:${{ steps.tags.outputs.sha-tag }}
           fail-build: ${{ inputs.grype-fail-build }}
           severity-cutoff: ${{ inputs.grype-severity-cutoff }}
+          vex: ${{ inputs.grype-vex }}
       - name: Upload Grype SARIF artifact
         if: ${{ inputs.grype && always() && steps.grype.outputs.sarif != '' }}
         uses: actions/upload-artifact@v7.0.1

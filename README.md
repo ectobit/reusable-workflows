@@ -100,6 +100,18 @@ with:
   grype-sarif-artifact-name: app-grype-sarif
 ```
 
+Callers with reviewed VEX documents should pass them explicitly. This avoids
+depending on Grype's implicit configuration-file discovery inside GitHub
+Actions and keeps the exception visible at the reusable-workflow boundary.
+
+```yaml
+with:
+  image: ghcr.io/example/app
+  platforms: linux/amd64
+  grype: true
+  grype-vex: security/openvex.json
+```
+
 Set `grype-fail-build: false` only for an explicit temporary risk acceptance. The scan still runs and uploads SARIF when available, but findings do not fail the workflow.
 
 ```yaml
@@ -165,7 +177,7 @@ jobs:
     uses: ectobit/reusable-workflows/.github/workflows/go-dependency-diff.yaml@main
     with:
       runner: '["self-hosted","linux","emaia"]'
-      go-version: 1.27.0
+      go-version: 1.27.1
       go-toolchain: local
       go-mod-file: backend/go.mod
       fail-on-changes: false
