@@ -27,5 +27,7 @@ jobs:
           cache: false
       - name: Test Buildx workflow contract
         run: sh test/buildx-contract.sh
+      - name: Test Go check workflow contract
+        run: sh test/go-check-contract.sh
       - name: Test Go dependency diff workflow
         run: sh test/go-dependency-diff.sh

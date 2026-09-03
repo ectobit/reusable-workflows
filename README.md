@@ -146,6 +146,19 @@ jobs:
       go-fix-check: false
 ```
 
+Go module and build caching is enabled by default for ephemeral and
+GitHub-hosted runners. Persistent self-hosted runners can keep their local Go
+caches between jobs and disable the remote cache transfer:
+
+```yaml
+with:
+  runner: '["self-hosted","linux","example"]'
+  cache: false
+```
+
+The separate Go tools cache remains enabled when the module and build cache is
+disabled.
+
 ## Compare direct Go dependencies
 
 `go-dependency-diff.yaml` compares direct requirements in a Go module file

@@ -6,6 +6,11 @@ on:
         required: false
         default: '"ubuntu-latest"'
         description: JSON runner label or label array passed to runs-on
+      cache:
+        type: boolean
+        required: false
+        default: true
+        description: whether to restore and save Go module and build caches
       go-version:
         type: string
         required: false
@@ -77,6 +82,7 @@ jobs:
           go-version: ${{ inputs.go-version }}
           cache: false
       - name: Set up go cache
+        if: ${{ inputs.cache }}
         uses: actions/cache@v6.1.0
         with:
           path: |
