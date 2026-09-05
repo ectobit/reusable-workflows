@@ -11,6 +11,11 @@ on:
         required: false
         default: true
         description: whether to restore and save Go module and build caches
+      fetch-depth:
+        type: number
+        required: false
+        default: 1
+        description: git history depth to check out; use 0 for full history when the lint command compares against a base revision
       go-version:
         type: string
         required: false
@@ -76,6 +81,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch-depth }}
       - name: Set up go
         uses: actions/setup-go@v7.0.0
         with:
