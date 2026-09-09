@@ -29,7 +29,7 @@ on:
       govulncheck-version:
         type: string
         required: false
-        default: v1.7.0
+        default: v1.8.0
         description: govulncheck version to use for vulnerability checks
       working-directory:
         type: string
