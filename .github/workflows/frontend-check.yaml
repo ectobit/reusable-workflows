@@ -92,6 +92,7 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
         run: bun install --frozen-lockfile
       - name: Verify Playwright compatibility
+        id: playwright
         if: ${{ inputs.browser-tests }}
         working-directory: ${{ inputs.working-directory }}
         env:
@@ -101,6 +102,7 @@ jobs:
           set -euo pipefail
           node <<'JS'
           const fs = require('node:fs');
+          const path = require('node:path');
           const { createRequire } = require('node:module');
           const project = createRequire(process.cwd() + '/package.json');
           const chain = ['@playwright/test', 'playwright', 'playwright-core'];
@@ -134,12 +136,17 @@ jobs:
             for (const browser of ['chromium', 'webkit']) {
               fs.accessSync(pw[browser].executablePath(), fs.constants.X_OK);
             }
+          } else {
+            const cli = path.join(path.dirname(manifest), 'cli.js');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `cli=${cli}\n`);
           }
           JS
       - name: Install Playwright browsers
         if: ${{ inputs.browser-tests && !inputs.preinstalled-tools }}
         working-directory: ${{ inputs.working-directory }}
-        run: ./node_modules/.bin/playwright install --with-deps chromium webkit
+        env:
+          PLAYWRIGHT_CLI: ${{ steps.playwright.outputs.cli }}
+        run: node "$PLAYWRIGHT_CLI" install --with-deps chromium webkit
       - name: Prepare
         if: ${{ inputs.prepare-command != '' }}
         working-directory: ${{ inputs.working-directory }}

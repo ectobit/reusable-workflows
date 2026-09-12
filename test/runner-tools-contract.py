@@ -153,6 +153,28 @@ class RunnerToolsContract(unittest.TestCase):
                 self.assertIn(str(executable), result.stderr)
                 executable.chmod(0o755)
 
+    def test_browser_install_uses_resolved_core_cli(self):
+        for entry in ['@playwright/test', 'playwright', 'playwright-core']:
+            with self.subTest(entry=entry):
+                core = self.isolated_playwright(entry)
+                (core / 'cli.js').write_text(
+                    "require('node:fs').writeFileSync(process.env.TOOL_LOG, JSON.stringify(process.argv.slice(2)));\n"
+                    "process.exit(Number(process.env.TEST_INSTALL_STATUS || 0));\n")
+                result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
+                                       PREINSTALLED_TOOLS='false')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                outputs = dict(line.split('=', 1) for line in (self.root / 'outputs').read_text().splitlines()) \
+                    if (self.root / 'outputs').exists() else {}
+                env = dict(PLAYWRIGHT_CLI=outputs.get('cli', ''))
+                result = self.run_step('frontend-check.yaml', 'Install Playwright browsers', **env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads((self.root / 'tool-log').read_text()),
+                                 ['install', '--with-deps', 'chromium', 'webkit'])
+                result = self.run_step('frontend-check.yaml', 'Install Playwright browsers',
+                                       **env, TEST_INSTALL_STATUS='23')
+                self.assertEqual(result.returncode, 23, result.stderr)
+            (self.root / 'node_modules' / entry).unlink()
+
     def test_checks_reject_empty_commands(self):
         for command in ['', ' \t\n ']:
             with self.subTest(command=command):

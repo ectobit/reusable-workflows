@@ -581,7 +581,9 @@ environment variable `RUNNER_PLAYWRIGHT_HOME` to an absolute directory to overri
 builds. No browser installation runs in this mode. The runner smoke test
 launches both engines; project tests exercise their own locked dependencies.
 Without preinstalled tools, Bun is set up and browser jobs run the project's
-Playwright installer with system dependencies. Custom commands such as Fallow
+resolved `playwright-core` CLI to install browsers with system dependencies.
+This supports `@playwright/test`, `playwright`, and `playwright-core` entry
+packages, including isolated dependency layouts. Custom commands such as Fallow
 still require the caller's runner to provide those tools.
 
 Example frontend unit/coverage checks:
