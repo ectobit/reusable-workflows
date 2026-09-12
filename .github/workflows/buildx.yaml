@@ -6,6 +6,16 @@ on:
         required: false
         default: '"ubuntu-latest"'
         description: JSON runner label or label array passed to runs-on
+      preinstalled-tools:
+        type: boolean
+        required: false
+        default: false
+        description: Use image-owned Hadolint 2.15.1 when Dockerfile linting is enabled
+      reuse-runner-builder:
+        type: boolean
+        required: false
+        default: false
+        description: Reuse BUILDX_BUILDER after verifying it supports every requested platform
       image:
         type: string
         required: true
@@ -116,21 +126,66 @@ jobs:
       - name: Check out
         uses: actions/checkout@v7.0.1
       - name: Lint Dockerfile with ignore
-        if: ${{ inputs.hadolint && inputs.hadolint-ignore != ''}}
+        if: ${{ inputs.hadolint && !inputs.preinstalled-tools && inputs.hadolint-ignore != ''}}
         uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: ${{ inputs.dockerfile }}
           failure-threshold: ${{ inputs.hadolint-failure-threshold }}
           ignore: ${{ inputs.hadolint-ignore }}
       - name: Lint Dockerfile
-        if: ${{ inputs.hadolint && inputs.hadolint-ignore == ''}}
+        if: ${{ inputs.hadolint && !inputs.preinstalled-tools && inputs.hadolint-ignore == ''}}
         uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: ${{ inputs.dockerfile }}
           failure-threshold: ${{ inputs.hadolint-failure-threshold }}
+      - name: Lint Dockerfile with preinstalled Hadolint
+        if: ${{ inputs.hadolint && inputs.preinstalled-tools }}
+        env:
+          DOCKERFILE: ${{ inputs.dockerfile }}
+          HADOLINT_FAILURE_THRESHOLD: ${{ inputs.hadolint-failure-threshold }}
+          HADOLINT_IGNORE: ${{ inputs.hadolint-ignore }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v hadolint >/dev/null || [[ "$(hadolint --version)" != *' 2.15.1' ]]; then
+            echo "::error::The runner must provide Hadolint 2.15.1 before preinstalled-tools can be enabled."
+            exit 1
+          fi
+          # Hadolint reads HADOLINT_IGNORE and HADOLINT_FAILURE_THRESHOLD from env, as hadolint-action does.
+          hadolint "$DOCKERFILE"
+      - name: Verify runner builder
+        id: runner-builder
+        if: ${{ inputs.reuse-runner-builder }}
+        env:
+          REQUESTED_PLATFORMS: ${{ inputs.platforms }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${BUILDX_BUILDER:-}" || ! "$BUILDX_BUILDER" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]]; then
+            echo "::error::Set BUILDX_BUILDER to this runner's dedicated builder name."
+            exit 1
+          fi
+          docker buildx version
+          BUILDER_INFO="$(docker buildx inspect "$BUILDX_BUILDER" --bootstrap)"
+          export BUILDER_INFO
+          python3 <<'PYTHON'
+          import os
+          available = set()
+          for line in os.environ['BUILDER_INFO'].splitlines():
+              if line.strip().startswith('Platforms:'):
+                  available.update(p.strip().rstrip('*') for p in line.split(':', 1)[1].split(','))
+          requested = {p.strip() for p in os.environ['REQUESTED_PLATFORMS'].split(',') if p.strip()}
+          if not requested:
+              raise SystemExit('platforms input is empty')
+          if requested - available:
+              raise SystemExit('Runner builder does not support requested platforms: ' + ', '.join(sorted(requested - available)) + '. Keep QEMU setup enabled until the host supports them.')
+          PYTHON
+          echo "name=$BUILDX_BUILDER" >> "$GITHUB_OUTPUT"
       - name: Set up QEMU
+        if: ${{ !inputs.reuse-runner-builder }}
         uses: docker/setup-qemu-action@v4.3.0
       - name: Set up Docker Buildx
+        if: ${{ !inputs.reuse-runner-builder }}
         uses: docker/setup-buildx-action@v4.3.0
       - name: Set up tags
         id: meta
@@ -175,6 +230,7 @@ jobs:
         uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.grype != true && inputs.cache-type == 'registry' && inputs.build-args == '' }}
         with:
+          builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
@@ -187,6 +243,7 @@ jobs:
         uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.grype != true && inputs.cache-type == 'registry' && inputs.build-args != '' }}
         with:
+          builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           build-args: ${{ inputs.build-args }}
@@ -200,6 +257,7 @@ jobs:
         uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.grype != true && inputs.cache-type == 'gha' && inputs.build-args == '' }}
         with:
+          builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
@@ -212,6 +270,7 @@ jobs:
         uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.grype != true && inputs.cache-type == 'gha' && inputs.build-args != '' }}
         with:
+          builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           build-args: ${{ inputs.build-args }}
@@ -225,6 +284,7 @@ jobs:
         uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.grype && inputs.cache-type == 'registry' && inputs.build-args == '' }}
         with:
+          builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
@@ -238,6 +298,7 @@ jobs:
         uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.grype && inputs.cache-type == 'registry' && inputs.build-args != '' }}
         with:
+          builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           build-args: ${{ inputs.build-args }}
@@ -252,6 +313,7 @@ jobs:
         uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.grype && inputs.cache-type == 'gha' && inputs.build-args == '' }}
         with:
+          builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           platforms: ${{ inputs.platforms }}
@@ -265,6 +327,7 @@ jobs:
         uses: docker/build-push-action@v7.3.0
         if: ${{ inputs.grype && inputs.cache-type == 'gha' && inputs.build-args != '' }}
         with:
+          builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
           build-args: ${{ inputs.build-args }}

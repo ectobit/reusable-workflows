@@ -13,13 +13,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: raven-actions/actionlint@v2
   build:
+    needs: actionlint
     runs-on: ubuntu-latest
     steps:
       - name: Check out
         uses: actions/checkout@v7.0.1
-      - name: Check workflow files
-        uses: raven-actions/actionlint@v2.2.0
       - name: Set up go
         uses: actions/setup-go@v7.0.0
         with:
@@ -31,3 +35,8 @@ jobs:
         run: sh test/go-check-contract.sh
       - name: Test Go dependency diff workflow
         run: sh test/go-dependency-diff.sh
+      - name: Test preinstalled tools and frontend workflow
+        run: |
+          python3 -m venv /tmp/workflow-contracts
+          /tmp/workflow-contracts/bin/pip install PyYAML==6.0.3
+          /tmp/workflow-contracts/bin/python test/runner-tools-contract.py

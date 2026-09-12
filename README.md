@@ -9,7 +9,7 @@ Please check the [.github/workflows](.github/workflows) directory
 
 ## Runner selection
 
-The `buildx.yaml`, `go-check.yaml`, and `chart.yaml` workflows accept an
+The `buildx.yaml`, `go-check.yaml`, `chart.yaml`, and `frontend-check.yaml` workflows accept an
 optional `runner` input containing a JSON runner label or label array. It
 defaults to `"ubuntu-latest"`, preserving existing callers. A trusted caller
 can target the Emaia laptop runner with:
@@ -498,3 +498,161 @@ Security notes:
 - Do not print private keys, kube tokens, kubeconfig contents, or certificates.
 - Keep the SSH private key in GitHub secrets and rotate it if it is exposed.
 - Start the SSH tunnel in the same GitHub Actions job that runs `kubectl`, `helm`, or `helmfile`, because jobs run on isolated runners.
+
+
+## Preinstalled runner tools
+
+`preinstalled-tools` defaults to `false`: existing callers keep their setup
+steps. Enable it only after rebuilding and recreating the self-hosted runner
+image. `chart.yaml` then requires Helm 4.3.0; `buildx.yaml` uses native
+Hadolint 2.15.1 when Dockerfile linting is enabled, retaining the selected
+failure threshold, ignore list, and project configuration. Version mismatches
+fail with an actionable error; they do not silently install another binary.
+
+```yaml
+with:
+  runner: '["self-hosted","linux","example"]'
+  preinstalled-tools: true
+```
+
+For `buildx.yaml`, independently enable `reuse-runner-builder: true` to use
+the runner's `BUILDX_BUILDER`. The workflow bootstraps and inspects that existing
+builder and requires all requested platforms before skipping QEMU and Buildx
+setup. It supplies the verified builder explicitly to every build action and
+does not remove it afterward. Provision platform emulation on the physical
+container host before opting in; installing QEMU inside a runner filesystem
+does not configure the host's binfmt handlers. Keep the existing setup when
+platform support is unavailable. Use a distinct builder per runner.
+
+```yaml
+with:
+  image: ghcr.io/example/app
+  runner: '["self-hosted","linux","example"]'
+  platforms: linux/amd64
+  preinstalled-tools: true
+  reuse-runner-builder: true
+  grype: true
+```
+
+Grype, VEX, SARIF upload, tags, caching, and scan-before-push behavior are
+unchanged. The Go workflows and their toolchain/cache policies are unchanged.
+
+## Frontend checks with Bun and Playwright
+
+`frontend-check.yaml` runs one job per call. Keep unit and browser checks as
+separate caller jobs to preserve parallelism, job-specific conditions, and
+required-check wiring. The workflow owns Bun **1.4.2** and Playwright **1.63.0**.
+A declared `packageManager` must agree with Bun; browser jobs must resolve the
+matching project-local `playwright-core` version from the frozen lockfile.
+
+Inputs:
+
+| Input | Default | Meaning |
+| --- | --- | --- |
+| `runner` | `"ubuntu-latest"` | JSON runner label or label array |
+| `preinstalled-tools` | `false` | Require image-owned Bun/browsers; skip setup/downloads |
+| `working-directory` | `.` | Directory containing package.json and the Bun lockfile |
+| `fetch-depth` | `1` | Checkout depth; use `0` for history-dependent checks |
+| `timeout-minutes` | `20` | Job timeout |
+| `browser-tests` | `false` | Verify or install Chromium and WebKit |
+| `prepare-command` | empty | Optional preparation after frozen dependency installation |
+| `check-command` | required | Checks in working-directory |
+| `root-check-command` | empty | Final checks from repository root |
+| `artifact-path` | empty | Optional repository-relative paths uploaded even on failure |
+| `artifact-name` | `frontend-results` | Unique artifact name per caller job |
+
+The required `check-command` rejects empty or whitespace-only values.
+Commands execute with failure propagation and pipefail. They are authored by
+the trusted caller workflow; do not construct them from PR titles, commit
+messages, or other untrusted event text. No test, coverage, Fallow, or browser
+failure is suppressed. The optional artifact upload tolerates absent result
+files, since tests can fail before creating a report.
+
+Frontend runners must provide Node.js on `PATH` for the Bun and Playwright
+compatibility checks, including when Bun is installed by the workflow.
+Playwright is resolved through the project's installed dependency chain,
+supporting isolated installs with only `@playwright/test` declared.
+
+With `preinstalled-tools: true`, browser jobs require the image's Playwright
+package at `/opt/runner-playwright/node_modules/playwright-core` (set the runner
+environment variable `RUNNER_PLAYWRIGHT_HOME` to an absolute directory to override
+`/opt/runner-playwright`) and
+`PLAYWRIGHT_BROWSERS_PATH` pointing to installed executable Chromium/WebKit
+builds. No browser installation runs in this mode. The runner smoke test
+launches both engines; project tests exercise their own locked dependencies.
+Without preinstalled tools, Bun is set up and browser jobs run the project's
+resolved `playwright-core` CLI to install browsers with system dependencies.
+This supports `@playwright/test`, `playwright`, and `playwright-core` entry
+packages, including isolated dependency layouts. Custom commands such as Fallow
+still require the caller's runner to provide those tools.
+
+Example frontend unit/coverage checks:
+
+```yaml
+jobs:
+  frontend-test:
+    # Keep the caller's existing needs and event/path conditions here.
+    uses: ectobit/reusable-workflows/.github/workflows/frontend-check.yaml@main
+    with:
+      runner: '["self-hosted","linux","emaia"]'
+      preinstalled-tools: true
+      working-directory: frontend
+      fetch-depth: 0
+      prepare-command: bun run generate-routes
+      check-command: |
+        bun run typecheck
+        bun run check
+        bun run test:coverage
+      root-check-command: >-
+        fallow audit --root frontend --config .fallowrc.json --gate all
+        --coverage coverage/coverage-final.json --fail-on-issues
+```
+
+Example widget unit checks:
+
+```yaml
+jobs:
+  widget-unit-test:
+    uses: ectobit/reusable-workflows/.github/workflows/frontend-check.yaml@main
+    with:
+      runner: '["self-hosted","linux","vega"]'
+      preinstalled-tools: true
+      check-command: bun run check:widget
+      root-check-command: make widget-sri-check
+```
+
+Browser jobs use the same workflow independently:
+
+```yaml
+jobs:
+  frontend-browser-test:
+    uses: ectobit/reusable-workflows/.github/workflows/frontend-check.yaml@main
+    with:
+      runner: '["self-hosted","linux","emaia"]'
+      preinstalled-tools: true
+      working-directory: frontend
+      browser-tests: true
+      check-command: |
+        bun run e2e -- e2e/landing-motion.spec.ts e2e/landing-locales.spec.ts
+        bun run e2e:accessibility
+      artifact-path: |
+        frontend/test-results
+        frontend/playwright-report
+      artifact-name: frontend-browser-results
+
+  widget-browser-test:
+    uses: ectobit/reusable-workflows/.github/workflows/frontend-check.yaml@main
+    with:
+      runner: '["self-hosted","linux","vega"]'
+      preinstalled-tools: true
+      browser-tests: true
+      check-command: bun run test:widget:e2e
+```
+
+Update caller workflows only after the shared workflows are published and the
+runner image is deployed. Preserve caller `needs`, `if`, permissions, and
+required-check names; these examples omit repository-specific scheduling.
+The shared workflow does not commit, publish, or deploy anything.
+
+Validate changes with `actionlint`, the existing shell contracts, and
+`python3 test/runner-tools-contract.py` (requires PyYAML and Node.js).
