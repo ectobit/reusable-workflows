@@ -9,7 +9,7 @@ Please check the [.github/workflows](.github/workflows) directory
 
 ## Runner selection
 
-The `buildx.yaml`, `go-check.yaml`, and `chart.yaml` workflows accept an
+The `buildx.yaml`, `go-check.yaml`, `chart.yaml`, and `frontend-check.yaml` workflows accept an
 optional `runner` input containing a JSON runner label or label array. It
 defaults to `"ubuntu-latest"`, preserving existing callers. A trusted caller
 can target the Emaia laptop runner with:
@@ -561,14 +561,22 @@ Inputs:
 | `artifact-path` | empty | Optional repository-relative paths uploaded even on failure |
 | `artifact-name` | `frontend-results` | Unique artifact name per caller job |
 
+The required `check-command` rejects empty or whitespace-only values.
 Commands execute with failure propagation and pipefail. They are authored by
 the trusted caller workflow; do not construct them from PR titles, commit
 messages, or other untrusted event text. No test, coverage, Fallow, or browser
 failure is suppressed. The optional artifact upload tolerates absent result
 files, since tests can fail before creating a report.
 
+Frontend runners must provide Node.js on `PATH` for the Bun and Playwright
+compatibility checks, including when Bun is installed by the workflow.
+Playwright is resolved through the project's installed dependency chain,
+supporting isolated installs with only `@playwright/test` declared.
+
 With `preinstalled-tools: true`, browser jobs require the image's Playwright
-package at `/opt/runner-playwright/node_modules/playwright-core` and
+package at `/opt/runner-playwright/node_modules/playwright-core` (set the runner
+environment variable `RUNNER_PLAYWRIGHT_HOME` to an absolute directory to override
+`/opt/runner-playwright`) and
 `PLAYWRIGHT_BROWSERS_PATH` pointing to installed executable Chromium/WebKit
 builds. No browser installation runs in this mode. The runner smoke test
 launches both engines; project tests exercise their own locked dependencies.

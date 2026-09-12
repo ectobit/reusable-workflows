@@ -71,8 +71,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v bun >/dev/null || [[ "$(bun --version)" != "$BUN_VERSION" ]]; then
-            echo "::error::Bun $BUN_VERSION is required. Update the runner image before opting into preinstalled-tools."
+          if ! command -v bun >/dev/null; then
+            echo "::error::Bun $BUN_VERSION is required; bun was not found on PATH."
+            exit 1
+          fi
+          actual_bun_version="$(bun --version)"
+          if [[ "$actual_bun_version" != "$BUN_VERSION" ]]; then
+            echo "::error::Bun $BUN_VERSION is required; found $actual_bun_version."
             exit 1
           fi
           node <<'JS'
@@ -98,15 +103,34 @@ jobs:
           const fs = require('node:fs');
           const { createRequire } = require('node:module');
           const project = createRequire(process.cwd() + '/package.json');
-          const version = project('playwright-core/package.json').version;
+          const chain = ['@playwright/test', 'playwright', 'playwright-core'];
+          let manifest;
+          let entry;
+          for (const [index, name] of chain.entries()) {
+            try {
+              manifest = project.resolve(`${name}/package.json`);
+              entry = index;
+              break;
+            } catch (error) {
+              if (error.code !== 'MODULE_NOT_FOUND') throw error;
+            }
+          }
+          if (!manifest) throw new Error('Project must install @playwright/test, playwright, or playwright-core.');
+          // Resolve each dependency from its parent for isolated package layouts.
+          for (const name of chain.slice(entry + 1)) {
+            manifest = createRequire(manifest).resolve(`${name}/package.json`);
+          }
+          const core = createRequire(manifest);
+          const version = require(manifest).version;
           if (version !== process.env.PLAYWRIGHT_VERSION) {
             throw new Error(`Project Playwright ${version} does not match workflow ${process.env.PLAYWRIGHT_VERSION}; update the workflow and runner browsers together.`);
           }
           if (process.env.PREINSTALLED_TOOLS === 'true') {
-            const bundled = require('/opt/runner-playwright/node_modules/playwright-core/package.json').version;
+            const runnerHome = process.env.RUNNER_PLAYWRIGHT_HOME || '/opt/runner-playwright';
+            const bundled = require(`${runnerHome}/node_modules/playwright-core/package.json`).version;
             if (bundled !== version) throw new Error(`Runner Playwright ${bundled} does not match project ${version}.`);
             if (!process.env.PLAYWRIGHT_BROWSERS_PATH) throw new Error('Runner must set PLAYWRIGHT_BROWSERS_PATH.');
-            const pw = project('playwright-core');
+            const pw = core('./');
             for (const browser of ['chromium', 'webkit']) {
               fs.accessSync(pw[browser].executablePath(), fs.constants.X_OK);
             }
@@ -126,7 +150,9 @@ jobs:
         working-directory: ${{ inputs.working-directory }}
         env:
           CHECK_COMMAND: ${{ inputs.check-command }}
-        run: bash -eo pipefail -c "$CHECK_COMMAND"
+        run: |
+          [[ -n "${CHECK_COMMAND//[[:space:]]/}" ]] || { echo '::error::check-command is empty'; exit 1; }
+          bash -eo pipefail -c "$CHECK_COMMAND"
       - name: Run repository-root checks
         if: ${{ inputs.root-check-command != '' }}
         env:

@@ -151,7 +151,8 @@ jobs:
             echo "::error::The runner must provide Hadolint 2.15.1 before preinstalled-tools can be enabled."
             exit 1
           fi
-          hadolint --failure-threshold "$HADOLINT_FAILURE_THRESHOLD" "$DOCKERFILE"
+          # Hadolint reads HADOLINT_IGNORE and HADOLINT_FAILURE_THRESHOLD from env, as hadolint-action does.
+          hadolint "$DOCKERFILE"
       - name: Verify runner builder
         id: runner-builder
         if: ${{ inputs.reuse-runner-builder }}
@@ -174,7 +175,9 @@ jobs:
               if line.strip().startswith('Platforms:'):
                   available.update(p.strip().rstrip('*') for p in line.split(':', 1)[1].split(','))
           requested = {p.strip() for p in os.environ['REQUESTED_PLATFORMS'].split(',') if p.strip()}
-          if not requested or requested - available:
+          if not requested:
+              raise SystemExit('platforms input is empty')
+          if requested - available:
               raise SystemExit('Runner builder does not support requested platforms: ' + ', '.join(sorted(requested - available)) + '. Keep QEMU setup enabled until the host supports them.')
           PYTHON
           echo "name=$BUILDX_BUILDER" >> "$GITHUB_OUTPUT"

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Execute workflow shell steps against isolated tools and fixture projects."""
 import os
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -31,7 +32,8 @@ class RunnerToolsContract(unittest.TestCase):
                         BUN_VERSION='1.4.2', PLAYWRIGHT_VERSION='1.63.0',
                         GITHUB_OUTPUT=str(self.root / 'outputs'),
                         TOOL_LOG=str(self.root / 'tool-log'))
-        self.env.pop('BUILDX_BUILDER', None)
+        for key in ['BUILDX_BUILDER', 'NODE_PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'RUNNER_PLAYWRIGHT_HOME']:
+            self.env.pop(key, None)
         (self.root / 'package.json').write_text('{"packageManager":"bun@1.4.2"}')
 
     def tool(self, name, script):
@@ -47,8 +49,13 @@ class RunnerToolsContract(unittest.TestCase):
     def test_bun_version_and_project_contract(self):
         self.tool('bun', 'echo "${TEST_BUN_VERSION:-1.4.2}"\n')
         self.assertEqual(self.run_step('frontend-check.yaml', 'Verify Bun toolchain').returncode, 0)
-        self.assertNotEqual(self.run_step('frontend-check.yaml', 'Verify Bun toolchain',
-                                         TEST_BUN_VERSION='1.4.0').returncode, 0)
+        for preinstalled in ['false', 'true']:
+            result = self.run_step('frontend-check.yaml', 'Verify Bun toolchain',
+                                   TEST_BUN_VERSION='1.4.0', PREINSTALLED_TOOLS=preinstalled)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('1.4.2', result.stdout)
+            self.assertIn('1.4.0', result.stdout)
+            self.assertNotIn('Update the runner image', result.stdout)
         (self.root / 'package.json').write_text('{"packageManager":"bun@1.4.0"}')
         result = self.run_step('frontend-check.yaml', 'Verify Bun toolchain')
         self.assertNotEqual(result.returncode, 0)
@@ -66,6 +73,92 @@ class RunnerToolsContract(unittest.TestCase):
                                PREINSTALLED_TOOLS='false')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('does not match workflow', result.stderr)
+
+    def test_missing_bun_has_actionable_error(self):
+        # Bash is already running; an empty PATH makes Bun unavailable.
+        result = subprocess.run(['/bin/bash', '-c', steps('frontend-check.yaml')['Verify Bun toolchain']['run']],
+                                cwd=self.root, env=dict(self.env, PATH=str(self.bin)),
+                                capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Bun 1.4.2 is required', result.stdout)
+        self.assertIn('not found', result.stdout)
+
+    def isolated_playwright(self, entry='@playwright/test'):
+        packages = {}
+        for name in ['@playwright/test', 'playwright', 'playwright-core']:
+            directory = self.root / 'store' / name.replace('/', '-')
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / 'package.json').write_text(json.dumps(
+                {'name': name, 'version': '1.63.0', 'main': 'index.js'}))
+            packages[name] = directory
+        for parent, child in [('@playwright/test', 'playwright'), ('playwright', 'playwright-core')]:
+            link = packages[parent] / 'node_modules' / child
+            link.parent.mkdir(parents=True, exist_ok=True)
+            if not link.is_symlink():
+                link.symlink_to(packages[child], target_is_directory=True)
+        link = self.root / 'node_modules' / entry
+        link.parent.mkdir(parents=True, exist_ok=True)
+        link.symlink_to(packages[entry], target_is_directory=True)
+        return packages['playwright-core']
+
+    def test_playwright_resolves_isolated_dependency_chain(self):
+        for entry in ['@playwright/test', 'playwright', 'playwright-core']:
+            with self.subTest(entry=entry):
+                core = self.isolated_playwright(entry)
+                result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
+                                       PREINSTALLED_TOOLS='false')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                (core / 'package.json').write_text('{"version":"1.62.0"}')
+                result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
+                                       PREINSTALLED_TOOLS='false')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('does not match workflow', result.stderr)
+            (self.root / 'node_modules' / entry).unlink()
+
+    def test_preinstalled_playwright_checks_runner_and_executables(self):
+        core = self.isolated_playwright()
+        (core / 'index.js').write_text(
+            "const path = require('node:path');\n"
+            "module.exports = Object.fromEntries(['chromium', 'webkit'].map(name =>\n"
+            "  [name, {executablePath: () => path.join(process.env.PLAYWRIGHT_BROWSERS_PATH, name)}]));\n")
+        browsers = self.root / 'browsers'
+        browsers.mkdir()
+        for name in ['chromium', 'webkit']:
+            executable = browsers / name
+            executable.write_text('#!/bin/sh\nexit 0\n')
+            executable.chmod(0o755)
+        home = self.root / 'runner-playwright'
+        bundled = home / 'node_modules/playwright-core/package.json'
+        bundled.parent.mkdir(parents=True)
+        bundled.write_text('{"version":"1.63.0"}')
+        env = dict(PREINSTALLED_TOOLS='true', RUNNER_PLAYWRIGHT_HOME=str(home),
+                   PLAYWRIGHT_BROWSERS_PATH=str(browsers))
+        result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        bundled.write_text('{"version":"1.62.0"}')
+        result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Runner Playwright 1.62.0 does not match project 1.63.0', result.stderr)
+        bundled.write_text('{"version":"1.63.0"}')
+        result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
+                               **dict(env, PLAYWRIGHT_BROWSERS_PATH=''))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Runner must set PLAYWRIGHT_BROWSERS_PATH', result.stderr)
+        for name in ['chromium', 'webkit']:
+            with self.subTest(browser=name):
+                executable = browsers / name
+                executable.chmod(0o644)
+                result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(str(executable), result.stderr)
+                executable.chmod(0o755)
+
+    def test_checks_reject_empty_commands(self):
+        for command in ['', ' \t\n ']:
+            with self.subTest(command=command):
+                result = self.run_step('frontend-check.yaml', 'Run checks', CHECK_COMMAND=command)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('check-command is empty', result.stdout)
 
     def test_caller_commands_fail_closed(self):
         for step, key in [('Prepare', 'PREPARE_COMMAND'), ('Run checks', 'CHECK_COMMAND'),
@@ -94,15 +187,18 @@ printf '%s\n' "$TEST_BUILDER_INFO"
         self.assertEqual((self.root / 'outputs').read_text(), 'name=fixture-builder\n')
         args['REQUESTED_PLATFORMS'] = 'linux/s390x'
         self.assertNotEqual(self.run_step('buildx.yaml', 'Verify runner builder', **args).returncode, 0)
-        args['REQUESTED_PLATFORMS'] = ''
-        self.assertNotEqual(self.run_step('buildx.yaml', 'Verify runner builder', **args).returncode, 0)
+        for platforms in ['', ' \t\n ']:
+            args['REQUESTED_PLATFORMS'] = platforms
+            result = self.run_step('buildx.yaml', 'Verify runner builder', **args)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('platforms input is empty', result.stderr)
         log = (self.root / 'tool-log').read_text()
         self.assertNotIn('create', log)
         self.assertNotIn('rm ', log)
 
     def test_hadolint_preserves_flags_and_failure(self):
         self.tool('hadolint', '''if [ "$1" = --version ]; then echo "Haskell Dockerfile Linter ${TEST_HADOLINT_VERSION:-2.15.1}"; exit 0; fi
-printf '%s\n' "$HADOLINT_IGNORE" "$@" > "$TOOL_LOG"
+printf '%s\n' "$HADOLINT_IGNORE" "$HADOLINT_FAILURE_THRESHOLD" "$@" > "$TOOL_LOG"
 exit "${TEST_LINT_STATUS:-0}"
 ''')
         env = dict(DOCKERFILE='a directory/Dockerfile', HADOLINT_FAILURE_THRESHOLD='warning',
@@ -110,7 +206,7 @@ exit "${TEST_LINT_STATUS:-0}"
         result = self.run_step('buildx.yaml', 'Lint Dockerfile with preinstalled Hadolint', **env)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / 'tool-log').read_text().splitlines(),
-                         ['DL3008,SC2086', '--failure-threshold', 'warning', 'a directory/Dockerfile'])
+                         ['DL3008,SC2086', 'warning', 'a directory/Dockerfile'])
         self.assertEqual(self.run_step('buildx.yaml', 'Lint Dockerfile with preinstalled Hadolint',
                                       **env, TEST_LINT_STATUS='1').returncode, 1)
         self.assertNotEqual(self.run_step('buildx.yaml', 'Lint Dockerfile with preinstalled Hadolint',
