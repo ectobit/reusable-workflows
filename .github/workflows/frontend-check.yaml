@@ -1,0 +1,141 @@
+name: Frontend checks
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        default: '"ubuntu-latest"'
+        description: JSON runner label or label array
+      preinstalled-tools:
+        type: boolean
+        default: false
+        description: Require image-owned Bun and browsers instead of installing them
+      working-directory:
+        type: string
+        default: .
+      fetch-depth:
+        type: number
+        default: 1
+      timeout-minutes:
+        type: number
+        default: 20
+      browser-tests:
+        type: boolean
+        default: false
+        description: Prepare or verify Chromium and WebKit for Playwright
+      prepare-command:
+        type: string
+        default: ''
+        description: Optional preparation in working-directory after dependency installation
+      check-command:
+        type: string
+        required: true
+        description: Required checks in working-directory; any failure fails the job
+      root-check-command:
+        type: string
+        default: ''
+        description: Optional final checks from the repository root, such as Fallow or SRI
+      artifact-path:
+        type: string
+        default: ''
+        description: Optional result paths relative to repository root, uploaded even on failure
+      artifact-name:
+        type: string
+        default: frontend-results
+        description: Use a unique name when calling this workflow multiple times in one run
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ${{ fromJSON(inputs.runner) }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    env:
+      CI: 'true'
+      BUN_VERSION: '1.4.2'
+      PLAYWRIGHT_VERSION: '1.63.0'
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: ${{ inputs.fetch-depth }}
+      - name: Set up Bun
+        if: ${{ !inputs.preinstalled-tools }}
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Verify Bun toolchain
+        working-directory: ${{ inputs.working-directory }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v bun >/dev/null || [[ "$(bun --version)" != "$BUN_VERSION" ]]; then
+            echo "::error::Bun $BUN_VERSION is required. Update the runner image before opting into preinstalled-tools."
+            exit 1
+          fi
+          node <<'JS'
+          const pkg = require(process.cwd() + '/package.json');
+          const expected = `bun@${process.env.BUN_VERSION}`;
+          if (pkg.packageManager && pkg.packageManager !== expected) {
+            console.error(`::error::packageManager is ${pkg.packageManager}; this workflow requires ${expected}. Update and validate the project toolchain first.`);
+            process.exit(1);
+          }
+          JS
+      - name: Install dependencies
+        working-directory: ${{ inputs.working-directory }}
+        run: bun install --frozen-lockfile
+      - name: Verify Playwright compatibility
+        if: ${{ inputs.browser-tests }}
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PREINSTALLED_TOOLS: ${{ inputs.preinstalled-tools }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'JS'
+          const fs = require('node:fs');
+          const { createRequire } = require('node:module');
+          const project = createRequire(process.cwd() + '/package.json');
+          const version = project('playwright-core/package.json').version;
+          if (version !== process.env.PLAYWRIGHT_VERSION) {
+            throw new Error(`Project Playwright ${version} does not match workflow ${process.env.PLAYWRIGHT_VERSION}; update the workflow and runner browsers together.`);
+          }
+          if (process.env.PREINSTALLED_TOOLS === 'true') {
+            const bundled = require('/opt/runner-playwright/node_modules/playwright-core/package.json').version;
+            if (bundled !== version) throw new Error(`Runner Playwright ${bundled} does not match project ${version}.`);
+            if (!process.env.PLAYWRIGHT_BROWSERS_PATH) throw new Error('Runner must set PLAYWRIGHT_BROWSERS_PATH.');
+            const pw = project('playwright-core');
+            for (const browser of ['chromium', 'webkit']) {
+              fs.accessSync(pw[browser].executablePath(), fs.constants.X_OK);
+            }
+          }
+          JS
+      - name: Install Playwright browsers
+        if: ${{ inputs.browser-tests && !inputs.preinstalled-tools }}
+        working-directory: ${{ inputs.working-directory }}
+        run: ./node_modules/.bin/playwright install --with-deps chromium webkit
+      - name: Prepare
+        if: ${{ inputs.prepare-command != '' }}
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PREPARE_COMMAND: ${{ inputs.prepare-command }}
+        run: bash -eo pipefail -c "$PREPARE_COMMAND"
+      - name: Run checks
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          CHECK_COMMAND: ${{ inputs.check-command }}
+        run: bash -eo pipefail -c "$CHECK_COMMAND"
+      - name: Run repository-root checks
+        if: ${{ inputs.root-check-command != '' }}
+        env:
+          ROOT_CHECK_COMMAND: ${{ inputs.root-check-command }}
+        run: bash -eo pipefail -c "$ROOT_CHECK_COMMAND"
+      - name: Upload results
+        if: ${{ always() && inputs.artifact-path != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: ${{ inputs.artifact-path }}
+          if-no-files-found: ignore

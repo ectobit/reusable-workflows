@@ -6,6 +6,11 @@ on:
         required: false
         default: '"ubuntu-latest"'
         description: JSON runner label or label array passed to runs-on
+      preinstalled-tools:
+        type: boolean
+        required: false
+        default: false
+        description: Require Helm 4.3.0 from the runner image instead of installing Helm
       chart:
         type: string
         required: true
@@ -95,7 +100,17 @@ jobs:
   build:
     runs-on: ${{ fromJSON(inputs.runner) }}
     steps:
+      - name: Verify preinstalled Helm
+        if: ${{ inputs.preinstalled-tools }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v helm >/dev/null || [[ "$(helm version --template '{{.Version}}')" != 'v4.3.0' ]]; then
+            echo "::error::The runner must provide Helm 4.3.0 before preinstalled-tools can be enabled."
+            exit 1
+          fi
       - name: Set up Helm
+        if: ${{ !inputs.preinstalled-tools }}
         uses: azure/setup-helm@v5.0.1
       - name: Check out
         uses: actions/checkout@v7.0.1
