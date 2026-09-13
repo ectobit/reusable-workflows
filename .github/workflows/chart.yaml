@@ -10,7 +10,7 @@ on:
         type: boolean
         required: false
         default: false
-        description: Require Helm 4.3.0 from the runner image instead of installing Helm
+        description: Require Helm from the runner image instead of installing Helm
       chart:
         type: string
         required: true
@@ -105,10 +105,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v helm >/dev/null || [[ "$(helm version --template '{{.Version}}')" != 'v4.3.0' ]]; then
-            echo "::error::The runner must provide Helm 4.3.0 before preinstalled-tools can be enabled."
-            exit 1
-          fi
+          helm version --short
       - name: Set up Helm
         if: ${{ !inputs.preinstalled-tools }}
         uses: azure/setup-helm@v5.0.1

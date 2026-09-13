@@ -504,10 +504,14 @@ Security notes:
 
 `preinstalled-tools` defaults to `false`: existing callers keep their setup
 steps. Enable it only after rebuilding and recreating the self-hosted runner
-image. `chart.yaml` then requires Helm 4.3.0; `buildx.yaml` uses native
-Hadolint 2.15.1 when Dockerfile linting is enabled, retaining the selected
-failure threshold, ignore list, and project configuration. Version mismatches
-fail with an actionable error; they do not silently install another binary.
+image. The runner image owns the Helm and Hadolint versions. In preinstalled
+mode, `chart.yaml` runs `helm version --short` and `buildx.yaml` runs
+`hadolint --version` before linting. These commands log the installed versions
+and fail if the tool is missing or cannot run; consumers do not enforce an exact
+release. Runner upgrades therefore need no Helm/Hadolint version edits here or
+in caller workflows. Hadolint retains the selected failure threshold, ignore
+list, and project configuration. Validate tool compatibility when updating the
+runner image. Bun and Playwright compatibility checks remain unchanged.
 
 ```yaml
 with:

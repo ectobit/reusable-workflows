@@ -219,7 +219,7 @@ printf '%s\n' "$TEST_BUILDER_INFO"
         self.assertNotIn('rm ', log)
 
     def test_hadolint_preserves_flags_and_failure(self):
-        self.tool('hadolint', '''if [ "$1" = --version ]; then echo "Haskell Dockerfile Linter ${TEST_HADOLINT_VERSION:-2.15.1}"; exit 0; fi
+        self.tool('hadolint', '''if [ "$1" = --version ]; then echo "Haskell Dockerfile Linter ${TEST_HADOLINT_VERSION:-2.15.1}"; exit "${TEST_VERSION_STATUS:-0}"; fi
 printf '%s\n' "$HADOLINT_IGNORE" "$HADOLINT_FAILURE_THRESHOLD" "$@" > "$TOOL_LOG"
 exit "${TEST_LINT_STATUS:-0}"
 ''')
@@ -231,14 +231,29 @@ exit "${TEST_LINT_STATUS:-0}"
                          ['DL3008,SC2086', 'warning', 'a directory/Dockerfile'])
         self.assertEqual(self.run_step('buildx.yaml', 'Lint Dockerfile with preinstalled Hadolint',
                                       **env, TEST_LINT_STATUS='1').returncode, 1)
+        result = self.run_step('buildx.yaml', 'Lint Dockerfile with preinstalled Hadolint',
+                               **env, TEST_HADOLINT_VERSION='99.0.0')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('99.0.0', result.stdout)
         self.assertNotEqual(self.run_step('buildx.yaml', 'Lint Dockerfile with preinstalled Hadolint',
-                                         **env, TEST_HADOLINT_VERSION='2.14.0').returncode, 0)
+                                         **env, TEST_VERSION_STATUS='1').returncode, 0)
 
-    def test_helm_rejects_incompatible_runner(self):
-        self.tool('helm', 'echo "${TEST_HELM_VERSION:-v4.3.0}"\n')
-        self.assertEqual(self.run_step('chart.yaml', 'Verify preinstalled Helm').returncode, 0)
+    def test_helm_uses_runner_version(self):
+        self.tool('helm', 'echo "${TEST_HELM_VERSION:-v4.3.0}"; exit "${TEST_VERSION_STATUS:-0}"\n')
+        for version in ['v4.3.0', 'v99.0.0']:
+            result = self.run_step('chart.yaml', 'Verify preinstalled Helm', TEST_HELM_VERSION=version)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(version, result.stdout)
         self.assertNotEqual(self.run_step('chart.yaml', 'Verify preinstalled Helm',
-                                         TEST_HELM_VERSION='v3.22.0').returncode, 0)
+                                         TEST_VERSION_STATUS='1').returncode, 0)
+
+    def test_missing_runner_tools_fail(self):
+        # Only bash is available: host-installed Helm/Hadolint cannot hide absence.
+        (self.bin / 'bash').symlink_to('/bin/bash')
+        for file, name in [('chart.yaml', 'Verify preinstalled Helm'),
+                           ('buildx.yaml', 'Lint Dockerfile with preinstalled Hadolint')]:
+            result = self.run_step(file, name, PATH=str(self.bin))
+            self.assertEqual(result.returncode, 127, result.stderr)
 
     def test_compatibility_and_security_gates(self):
         for name in ['chart.yaml', 'buildx.yaml', 'frontend-check.yaml']:

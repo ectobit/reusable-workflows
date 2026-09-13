@@ -10,7 +10,7 @@ on:
         type: boolean
         required: false
         default: false
-        description: Use image-owned Hadolint 2.15.1 when Dockerfile linting is enabled
+        description: Use image-owned Hadolint when Dockerfile linting is enabled
       reuse-runner-builder:
         type: boolean
         required: false
@@ -147,10 +147,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v hadolint >/dev/null || [[ "$(hadolint --version)" != *' 2.15.1' ]]; then
-            echo "::error::The runner must provide Hadolint 2.15.1 before preinstalled-tools can be enabled."
-            exit 1
-          fi
+          hadolint --version
           # Hadolint reads HADOLINT_IGNORE and HADOLINT_FAILURE_THRESHOLD from env, as hadolint-action does.
           hadolint "$DOCKERFILE"
       - name: Verify runner builder
