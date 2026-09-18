@@ -183,7 +183,7 @@ jobs:
         uses: docker/setup-qemu-action@v4.4.0
       - name: Set up Docker Buildx
         if: ${{ !inputs.reuse-runner-builder }}
-        uses: docker/setup-buildx-action@v4.4.0
+        uses: docker/setup-buildx-action@v4.4.1
       - name: Set up tags
         id: meta
         uses: docker/metadata-action@v6.2.0
