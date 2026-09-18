@@ -180,7 +180,7 @@ jobs:
           echo "name=$BUILDX_BUILDER" >> "$GITHUB_OUTPUT"
       - name: Set up QEMU
         if: ${{ !inputs.reuse-runner-builder }}
-        uses: docker/setup-qemu-action@v4.3.0
+        uses: docker/setup-qemu-action@v4.4.0
       - name: Set up Docker Buildx
         if: ${{ !inputs.reuse-runner-builder }}
         uses: docker/setup-buildx-action@v4.3.0
