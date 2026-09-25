@@ -87,7 +87,7 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     concurrency:
       group: ${{ inputs.concurrency-group != '' && inputs.concurrency-group || format('{0}-{1}', github.workflow, github.run_id) }}
       cancel-in-progress: ${{ inputs.cancel-in-progress }}
