@@ -346,7 +346,7 @@ jobs:
           vex: ${{ inputs.grype-vex }}
       - name: Upload Grype SARIF artifact
         if: ${{ inputs.grype && always() && steps.grype.outputs.sarif != '' }}
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: ${{ inputs.grype-sarif-artifact-name }}
           path: ${{ steps.grype.outputs.sarif }}

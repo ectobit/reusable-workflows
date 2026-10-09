@@ -29,7 +29,7 @@ class RunnerToolsContract(unittest.TestCase):
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ['PATH'],
-                        BUN_VERSION='1.4.2', PLAYWRIGHT_VERSION='1.63.0',
+                        BUN_VERSION='1.4.2', PLAYWRIGHT_VERSION='1.64.0',
                         GITHUB_OUTPUT=str(self.root / 'outputs'),
                         TOOL_LOG=str(self.root / 'tool-log'))
         for key in ['BUILDX_BUILDER', 'NODE_PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'RUNNER_PLAYWRIGHT_HOME']:
@@ -65,7 +65,7 @@ class RunnerToolsContract(unittest.TestCase):
         module = self.root / 'node_modules/playwright-core'
         module.mkdir(parents=True)
         package = module / 'package.json'
-        package.write_text('{"version":"1.63.0"}')
+        package.write_text('{"version":"1.64.0"}')
         self.assertEqual(self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
                                       PREINSTALLED_TOOLS='false').returncode, 0)
         package.write_text('{"version":"1.62.0"}')
@@ -89,7 +89,7 @@ class RunnerToolsContract(unittest.TestCase):
             directory = self.root / 'store' / name.replace('/', '-')
             directory.mkdir(parents=True, exist_ok=True)
             (directory / 'package.json').write_text(json.dumps(
-                {'name': name, 'version': '1.63.0', 'main': 'index.js'}))
+                {'name': name, 'version': '1.64.0', 'main': 'index.js'}))
             packages[name] = directory
         for parent, child in [('@playwright/test', 'playwright'), ('playwright', 'playwright-core')]:
             link = packages[parent] / 'node_modules' / child
@@ -130,7 +130,7 @@ class RunnerToolsContract(unittest.TestCase):
         home = self.root / 'runner-playwright'
         bundled = home / 'node_modules/playwright-core/package.json'
         bundled.parent.mkdir(parents=True)
-        bundled.write_text('{"version":"1.63.0"}')
+        bundled.write_text('{"version":"1.64.0"}')
         env = dict(PREINSTALLED_TOOLS='true', RUNNER_PLAYWRIGHT_HOME=str(home),
                    PLAYWRIGHT_BROWSERS_PATH=str(browsers))
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
@@ -138,8 +138,8 @@ class RunnerToolsContract(unittest.TestCase):
         bundled.write_text('{"version":"1.62.0"}')
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Runner Playwright 1.62.0 does not match project 1.63.0', result.stderr)
-        bundled.write_text('{"version":"1.63.0"}')
+        self.assertIn('Runner Playwright 1.62.0 does not match project 1.64.0', result.stderr)
+        bundled.write_text('{"version":"1.64.0"}')
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
                                **dict(env, PLAYWRIGHT_BROWSERS_PATH=''))
         self.assertNotEqual(result.returncode, 0)

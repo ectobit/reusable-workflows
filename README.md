@@ -190,7 +190,7 @@ jobs:
     uses: ectobit/reusable-workflows/.github/workflows/go-dependency-diff.yaml@main
     with:
       runner: '["self-hosted","linux","emaia"]'
-      go-version: 1.27.1
+      go-version: 1.27.2
       go-toolchain: local
       go-mod-file: backend/go.mod
       fail-on-changes: false
@@ -545,9 +545,11 @@ unchanged. The Go workflows and their toolchain/cache policies are unchanged.
 
 `frontend-check.yaml` runs one job per call. Keep unit and browser checks as
 separate caller jobs to preserve parallelism, job-specific conditions, and
-required-check wiring. The workflow owns Bun **1.4.2** and Playwright **1.63.0**.
+required-check wiring. The workflow owns Bun **1.4.2** and Playwright **1.64.0**.
 A declared `packageManager` must agree with Bun; browser jobs must resolve the
 matching project-local `playwright-core` version from the frozen lockfile.
+When upgrading Playwright, update caller dependencies and lockfiles, and
+preinstalled runner packages and browser builds, to the workflow version.
 
 Inputs:
 
