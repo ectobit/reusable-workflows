@@ -19,7 +19,7 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.27.2
+        default: 1.27.3
         description: go version to use for checks
       golangci-lint-version:
         type: string
@@ -29,7 +29,7 @@ on:
       govulncheck-version:
         type: string
         required: false
-        default: v1.8.0
+        default: v1.9.0
         description: govulncheck version to use for vulnerability checks
       working-directory:
         type: string

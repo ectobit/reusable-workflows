@@ -29,7 +29,8 @@ class RunnerToolsContract(unittest.TestCase):
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ['PATH'],
-                        BUN_VERSION='1.4.3', PLAYWRIGHT_VERSION='1.64.0',
+                        BUN_VERSION='1.4.3',
+                        PLAYWRIGHT_VERSION=workflow('frontend-check.yaml')['jobs']['check']['env']['PLAYWRIGHT_VERSION'],
                         GITHUB_OUTPUT=str(self.root / 'outputs'),
                         TOOL_LOG=str(self.root / 'tool-log'))
         for key in ['BUILDX_BUILDER', 'NODE_PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'RUNNER_PLAYWRIGHT_HOME']:
@@ -65,7 +66,7 @@ class RunnerToolsContract(unittest.TestCase):
         module = self.root / 'node_modules/playwright-core'
         module.mkdir(parents=True)
         package = module / 'package.json'
-        package.write_text('{"version":"1.64.0"}')
+        package.write_text('{"version":"1.64.1"}')
         self.assertEqual(self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
                                       PREINSTALLED_TOOLS='false').returncode, 0)
         package.write_text('{"version":"1.62.0"}')
@@ -89,7 +90,7 @@ class RunnerToolsContract(unittest.TestCase):
             directory = self.root / 'store' / name.replace('/', '-')
             directory.mkdir(parents=True, exist_ok=True)
             (directory / 'package.json').write_text(json.dumps(
-                {'name': name, 'version': '1.64.0', 'main': 'index.js'}))
+                {'name': name, 'version': '1.64.1', 'main': 'index.js'}))
             packages[name] = directory
         for parent, child in [('@playwright/test', 'playwright'), ('playwright', 'playwright-core')]:
             link = packages[parent] / 'node_modules' / child
@@ -130,7 +131,7 @@ class RunnerToolsContract(unittest.TestCase):
         home = self.root / 'runner-playwright'
         bundled = home / 'node_modules/playwright-core/package.json'
         bundled.parent.mkdir(parents=True)
-        bundled.write_text('{"version":"1.64.0"}')
+        bundled.write_text('{"version":"1.64.1"}')
         env = dict(PREINSTALLED_TOOLS='true', RUNNER_PLAYWRIGHT_HOME=str(home),
                    PLAYWRIGHT_BROWSERS_PATH=str(browsers))
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
@@ -138,8 +139,8 @@ class RunnerToolsContract(unittest.TestCase):
         bundled.write_text('{"version":"1.62.0"}')
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Runner Playwright 1.62.0 does not match project 1.64.0', result.stderr)
-        bundled.write_text('{"version":"1.64.0"}')
+        self.assertIn('Runner Playwright 1.62.0 does not match project 1.64.1', result.stderr)
+        bundled.write_text('{"version":"1.64.1"}')
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
                                **dict(env, PLAYWRIGHT_BROWSERS_PATH=''))
         self.assertNotEqual(result.returncode, 0)
@@ -197,7 +198,7 @@ class RunnerToolsContract(unittest.TestCase):
 
     def test_builder_requires_name_and_capabilities(self):
         self.tool('docker', '''printf '%s\n' "$*" >> "$TOOL_LOG"
-if [ "$2" = version ]; then echo 'github.com/docker/buildx v0.37.1'; exit 0; fi
+if [ "$2" = version ]; then echo 'github.com/docker/buildx v0.38.0'; exit 0; fi
 printf '%s\n' "$TEST_BUILDER_INFO"
 ''')
         info = 'Name: fixture\nPlatforms: linux/arm64*, linux/amd64, linux/amd64/v2\n'
@@ -239,8 +240,8 @@ exit "${TEST_LINT_STATUS:-0}"
                                          **env, TEST_VERSION_STATUS='1').returncode, 0)
 
     def test_helm_uses_runner_version(self):
-        self.tool('helm', 'echo "${TEST_HELM_VERSION:-v4.3.0}"; exit "${TEST_VERSION_STATUS:-0}"\n')
-        for version in ['v4.3.0', 'v99.0.0']:
+        self.tool('helm', 'echo "${TEST_HELM_VERSION:-v4.3.1}"; exit "${TEST_VERSION_STATUS:-0}"\n')
+        for version in ['v4.3.1', 'v99.0.0']:
             result = self.run_step('chart.yaml', 'Verify preinstalled Helm', TEST_HELM_VERSION=version)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(version, result.stdout)
