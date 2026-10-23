@@ -89,7 +89,7 @@ with:
   hadolint-failure-threshold: warning
 ```
 
-`buildx.yaml` can also scan the built image with Grype before pushing it. This mode builds the image once into the local Docker engine, scans that same image, and only pushes the scanned tags when the scan passes. Because the scanned image is loaded locally, this mode supports one platform at a time. Multi-platform callers should keep `grype: false` or split scans by platform.
+`buildx.yaml` can also scan the built image with Grype **0.121.0** before pushing it. This mode builds the image once into the local Docker engine, scans that same image, and only pushes the scanned tags when the scan passes. Because the scanned image is loaded locally, this mode supports one platform at a time. Multi-platform callers should keep `grype: false` or split scans by platform.
 
 ```yaml
 with:
@@ -545,7 +545,7 @@ unchanged. The Go workflows and their toolchain/cache policies are unchanged.
 
 `frontend-check.yaml` runs one job per call. Keep unit and browser checks as
 separate caller jobs to preserve parallelism, job-specific conditions, and
-required-check wiring. The workflow owns Bun **1.4.3** and Playwright **1.64.1**.
+required-check wiring. The workflow owns Bun **1.4.4** and Playwright **1.64.1**.
 A declared `packageManager` must agree with Bun; browser jobs must resolve the
 matching project-local `playwright-core` version from the frozen lockfile.
 When upgrading Playwright, update caller dependencies and lockfiles, and

@@ -29,13 +29,13 @@ class RunnerToolsContract(unittest.TestCase):
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ['PATH'],
-                        BUN_VERSION='1.4.3',
+                        BUN_VERSION=workflow('frontend-check.yaml')['jobs']['check']['env']['BUN_VERSION'],
                         PLAYWRIGHT_VERSION=workflow('frontend-check.yaml')['jobs']['check']['env']['PLAYWRIGHT_VERSION'],
                         GITHUB_OUTPUT=str(self.root / 'outputs'),
                         TOOL_LOG=str(self.root / 'tool-log'))
         for key in ['BUILDX_BUILDER', 'NODE_PATH', 'PLAYWRIGHT_BROWSERS_PATH', 'RUNNER_PLAYWRIGHT_HOME']:
             self.env.pop(key, None)
-        (self.root / 'package.json').write_text('{"packageManager":"bun@1.4.3"}')
+        (self.root / 'package.json').write_text(json.dumps({'packageManager': 'bun@' + self.env['BUN_VERSION']}))
 
     def tool(self, name, script):
         p = self.bin / name
@@ -48,13 +48,13 @@ class RunnerToolsContract(unittest.TestCase):
                               capture_output=True, text=True)
 
     def test_bun_version_and_project_contract(self):
-        self.tool('bun', 'echo "${TEST_BUN_VERSION:-1.4.3}"\n')
+        self.tool('bun', 'echo "${TEST_BUN_VERSION:-$BUN_VERSION}"\n')
         self.assertEqual(self.run_step('frontend-check.yaml', 'Verify Bun toolchain').returncode, 0)
         for preinstalled in ['false', 'true']:
             result = self.run_step('frontend-check.yaml', 'Verify Bun toolchain',
                                    TEST_BUN_VERSION='1.4.0', PREINSTALLED_TOOLS=preinstalled)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn('1.4.3', result.stdout)
+            self.assertIn(self.env['BUN_VERSION'], result.stdout)
             self.assertIn('1.4.0', result.stdout)
             self.assertNotIn('Update the runner image', result.stdout)
         (self.root / 'package.json').write_text('{"packageManager":"bun@1.4.0"}')
@@ -81,7 +81,7 @@ class RunnerToolsContract(unittest.TestCase):
                                 cwd=self.root, env=dict(self.env, PATH=str(self.bin)),
                                 capture_output=True, text=True)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Bun 1.4.3 is required', result.stdout)
+        self.assertIn(f"Bun {self.env['BUN_VERSION']} is required", result.stdout)
         self.assertIn('not found', result.stdout)
 
     def isolated_playwright(self, entry='@playwright/test'):
