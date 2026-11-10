@@ -50,6 +50,16 @@ on:
         required: false
         default: registry
         description: buildx cache type [regstry | gha]
+      pull:
+        type: boolean
+        required: false
+        default: false
+        description: Always check for newer base images
+      no-cache-filters:
+        type: string
+        required: false
+        default: ''
+        description: Comma-separated or newline-separated stage names to rebuild without cache
       license:
         type: string
         required: false
@@ -230,6 +240,8 @@ jobs:
           builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          pull: ${{ inputs.pull }}
+          no-cache-filters: ${{ inputs.no-cache-filters }}
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -243,6 +255,8 @@ jobs:
           builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          pull: ${{ inputs.pull }}
+          no-cache-filters: ${{ inputs.no-cache-filters }}
           build-args: ${{ inputs.build-args }}
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
@@ -257,6 +271,8 @@ jobs:
           builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          pull: ${{ inputs.pull }}
+          no-cache-filters: ${{ inputs.no-cache-filters }}
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -270,6 +286,8 @@ jobs:
           builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          pull: ${{ inputs.pull }}
+          no-cache-filters: ${{ inputs.no-cache-filters }}
           build-args: ${{ inputs.build-args }}
           platforms: ${{ inputs.platforms }}
           push: ${{ inputs.push }}
@@ -284,6 +302,8 @@ jobs:
           builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          pull: ${{ inputs.pull }}
+          no-cache-filters: ${{ inputs.no-cache-filters }}
           platforms: ${{ inputs.platforms }}
           load: true
           push: false
@@ -298,6 +318,8 @@ jobs:
           builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          pull: ${{ inputs.pull }}
+          no-cache-filters: ${{ inputs.no-cache-filters }}
           build-args: ${{ inputs.build-args }}
           platforms: ${{ inputs.platforms }}
           load: true
@@ -313,6 +335,8 @@ jobs:
           builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          pull: ${{ inputs.pull }}
+          no-cache-filters: ${{ inputs.no-cache-filters }}
           platforms: ${{ inputs.platforms }}
           load: true
           push: false
@@ -327,6 +351,8 @@ jobs:
           builder: ${{ steps.runner-builder.outputs.name }}
           context: ${{ inputs.context }}
           file: ${{ inputs.dockerfile }}
+          pull: ${{ inputs.pull }}
+          no-cache-filters: ${{ inputs.no-cache-filters }}
           build-args: ${{ inputs.build-args }}
           platforms: ${{ inputs.platforms }}
           load: true

@@ -256,6 +256,21 @@ exit "${TEST_LINT_STATUS:-0}"
             result = self.run_step(file, name, PATH=str(self.bin))
             self.assertEqual(result.returncode, 127, result.stderr)
 
+    def test_runtime_refresh_controls_cover_every_build_variant(self):
+        data = workflow('buildx.yaml')
+        inputs = data.get('on', data.get(True))['workflow_call']['inputs']
+        self.assertIs(inputs['pull']['default'], False)
+        self.assertEqual(inputs['no-cache-filters']['default'], '')
+        builds = [step for step in steps('buildx.yaml').values()
+                  if step.get('uses', '').startswith('docker/build-push-action@')]
+        self.assertEqual(len(builds), 8)
+        for step in builds:
+            with self.subTest(step=step['name']):
+                self.assertEqual(step['with']['pull'], '${{ inputs.pull }}')
+                self.assertEqual(step['with']['no-cache-filters'], '${{ inputs.no-cache-filters }}')
+                self.assertIn('cache-from', step['with'])
+                self.assertNotIn('no-cache', step['with'])
+
     def test_compatibility_and_security_gates(self):
         for name in ['chart.yaml', 'buildx.yaml', 'frontend-check.yaml']:
             data = workflow(name)

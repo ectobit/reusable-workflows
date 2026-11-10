@@ -662,3 +662,22 @@ The shared workflow does not commit, publish, or deploy anything.
 
 Validate changes with `actionlint`, the existing shell contracts, and
 `python3 test/runner-tools-contract.py` (requires PyYAML and Node.js).
+
+## Refresh runtime packages
+
+`buildx.yaml` accepts optional `pull` (default `false`) and `no-cache-filters`
+(default empty) inputs. They apply to every build variant, including scan-before-push.
+Name the final Dockerfile stage (`FROM ... AS runtime`) and use:
+
+```yaml
+with:
+  platforms: linux/amd64
+  pull: true
+  no-cache-filters: runtime
+```
+
+This checks for newer base images and executes runtime package upgrades on every
+build while retaining the independent builder stage cache. Package repository
+changes alone do not invalidate a cached `RUN apk upgrade` layer. Keep image
+vulnerability scanning enabled. Publish this workflow update before updating
+callers to use the new inputs.
