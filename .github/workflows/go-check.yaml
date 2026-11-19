@@ -19,7 +19,7 @@ on:
       go-version:
         type: string
         required: false
-        default: 1.27.3
+        default: stable
         description: go version to use for checks
       golangci-lint-version:
         type: string
@@ -80,35 +80,37 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runner) }}
     steps:
       - name: Check out
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@v7
         with:
           fetch-depth: ${{ inputs.fetch-depth }}
       - name: Set up go
-        uses: actions/setup-go@v7.0.0
+        id: setup-go
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ inputs.go-version }}
+          check-latest: true
           cache: false
       - name: Set up go cache
         if: ${{ inputs.cache }}
-        uses: actions/cache@v6.1.0
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ inputs.go-version }}-${{ inputs.working-directory }}-${{ hashFiles('**/go.mod', '**/go.sum') }}
+          key: ${{ runner.os }}-go-${{ steps.setup-go.outputs.go-version }}-${{ inputs.working-directory }}-${{ hashFiles('**/go.mod', '**/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-${{ inputs.go-version }}-${{ inputs.working-directory }}-
-            ${{ runner.os }}-go-${{ inputs.go-version }}-
+            ${{ runner.os }}-go-${{ steps.setup-go.outputs.go-version }}-${{ inputs.working-directory }}-
+            ${{ runner.os }}-go-${{ steps.setup-go.outputs.go-version }}-
             ${{ runner.os }}-go-
       - name: Set up tools path
         run: |
           mkdir -p "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Set up tools cache
-        uses: actions/cache@v6.1.0
+        uses: actions/cache@v6
         with:
           path: ~/.local/bin
-          key: ${{ runner.os }}-go-tools-${{ inputs.go-version }}-${{ inputs.golangci-lint-version }}-${{ inputs.govulncheck-version }}
+          key: ${{ runner.os }}-go-tools-${{ steps.setup-go.outputs.go-version }}-${{ inputs.golangci-lint-version }}-${{ inputs.govulncheck-version }}
       - name: Set up linters and vulnerability checkers
         env:
           GOEXPERIMENT: ${{ inputs.go-experiment }}

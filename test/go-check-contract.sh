@@ -22,4 +22,14 @@ awk '
 grep -Fq '          cache: false' "$workflow"
 grep -Fq '      - name: Set up tools cache' "$workflow"
 
+awk '
+  /^      go-version:$/ { in_go_input = 1; next }
+  in_go_input && /^      [A-Za-z0-9_-]+:$/ { exit }
+  in_go_input && $0 == "        default: stable" { has_default = 1 }
+  END { exit !has_default }
+' "$workflow"
+
+grep -Fq '          check-latest: true' "$workflow"
+grep -Fq 'go-tools-${{ steps.setup-go.outputs.go-version }}-' "$workflow"
+
 printf 'go-check workflow contract passed\n'

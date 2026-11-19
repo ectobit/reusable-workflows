@@ -66,7 +66,7 @@ class RunnerToolsContract(unittest.TestCase):
         module = self.root / 'node_modules/playwright-core'
         module.mkdir(parents=True)
         package = module / 'package.json'
-        package.write_text('{"version":"1.64.1"}')
+        package.write_text('{"version":"1.65.1"}')
         self.assertEqual(self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
                                       PREINSTALLED_TOOLS='false').returncode, 0)
         package.write_text('{"version":"1.62.0"}')
@@ -90,7 +90,7 @@ class RunnerToolsContract(unittest.TestCase):
             directory = self.root / 'store' / name.replace('/', '-')
             directory.mkdir(parents=True, exist_ok=True)
             (directory / 'package.json').write_text(json.dumps(
-                {'name': name, 'version': '1.64.1', 'main': 'index.js'}))
+                {'name': name, 'version': '1.65.1', 'main': 'index.js'}))
             packages[name] = directory
         for parent, child in [('@playwright/test', 'playwright'), ('playwright', 'playwright-core')]:
             link = packages[parent] / 'node_modules' / child
@@ -131,7 +131,7 @@ class RunnerToolsContract(unittest.TestCase):
         home = self.root / 'runner-playwright'
         bundled = home / 'node_modules/playwright-core/package.json'
         bundled.parent.mkdir(parents=True)
-        bundled.write_text('{"version":"1.64.1"}')
+        bundled.write_text('{"version":"1.65.1"}')
         env = dict(PREINSTALLED_TOOLS='true', RUNNER_PLAYWRIGHT_HOME=str(home),
                    PLAYWRIGHT_BROWSERS_PATH=str(browsers))
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
@@ -139,8 +139,8 @@ class RunnerToolsContract(unittest.TestCase):
         bundled.write_text('{"version":"1.62.0"}')
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility', **env)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Runner Playwright 1.62.0 does not match project 1.64.1', result.stderr)
-        bundled.write_text('{"version":"1.64.1"}')
+        self.assertIn('Runner Playwright 1.62.0 does not match project 1.65.1', result.stderr)
+        bundled.write_text('{"version":"1.65.1"}')
         result = self.run_step('frontend-check.yaml', 'Verify Playwright compatibility',
                                **dict(env, PLAYWRIGHT_BROWSERS_PATH=''))
         self.assertNotEqual(result.returncode, 0)
