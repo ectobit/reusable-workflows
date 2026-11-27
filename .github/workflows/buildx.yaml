@@ -366,7 +366,7 @@ jobs:
         if: ${{ inputs.grype }}
         uses: anchore/scan-action@v7.4.3
         with:
-          grype-version: v0.121.0
+          grype-version: v0.122.1
           image: ${{ inputs.image }}:${{ steps.tags.outputs.sha-tag }}
           fail-build: ${{ inputs.grype-fail-build }}
           severity-cutoff: ${{ inputs.grype-severity-cutoff }}

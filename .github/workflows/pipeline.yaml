@@ -27,7 +27,7 @@ jobs:
       - name: Set up go
         uses: actions/setup-go@v7.1.0
         with:
-          go-version: 1.27.3
+          go-version: 1.27.4
           cache: false
       - name: Test Buildx workflow contract
         run: sh test/buildx-contract.sh
@@ -38,5 +38,5 @@ jobs:
       - name: Test preinstalled tools and frontend workflow
         run: |
           python3 -m venv /tmp/workflow-contracts
-          /tmp/workflow-contracts/bin/pip install PyYAML==6.0.3
+          /tmp/workflow-contracts/bin/pip install PyYAML==6.0.4
           /tmp/workflow-contracts/bin/python test/runner-tools-contract.py

@@ -89,7 +89,7 @@ with:
   hadolint-failure-threshold: warning
 ```
 
-`buildx.yaml` can also scan the built image with Grype **0.121.0** before pushing it. This mode builds the image once into the local Docker engine, scans that same image, and only pushes the scanned tags when the scan passes. Because the scanned image is loaded locally, this mode supports one platform at a time. Multi-platform callers should keep `grype: false` or split scans by platform.
+`buildx.yaml` can also scan the built image with Grype **0.122.1** before pushing it. This mode builds the image once into the local Docker engine, scans that same image, and only pushes the scanned tags when the scan passes. Because the scanned image is loaded locally, this mode supports one platform at a time. Multi-platform callers should keep `grype: false` or split scans by platform.
 
 ```yaml
 with:
@@ -141,7 +141,7 @@ jobs:
       working-directory: backend
       lint-command: make lint
       extra-check-command: make openapi-check
-      govulncheck-version: v1.9.0
+      govulncheck-version: v1.10.0
       go-toolchain: local
       go-fix-check: false
 ```
@@ -190,7 +190,7 @@ jobs:
     uses: ectobit/reusable-workflows/.github/workflows/go-dependency-diff.yaml@main
     with:
       runner: '["self-hosted","linux","emaia"]'
-      go-version: 1.27.3
+      go-version: 1.27.4
       go-toolchain: local
       go-mod-file: backend/go.mod
       fail-on-changes: false
